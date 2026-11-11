@@ -1,0 +1,46 @@
+{
+  "name": "leadership-race",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "F1 Leadership Race — interactive game",
+  "author": "AnthonyGunardi",
+  "packageManager": "npm@11.3.0",
+  "engines": {
+    "node": "26.13.0",
+    "npm": "11.3.0"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "lint": "eslint .",
+    "build": "npm run build --workspace backend && npm run build --workspace frontend",
+    "test": "vitest run --root backend && vitest run --root frontend",
+    "test:coverage": "vitest run --root backend --coverage && vitest run --root frontend --coverage",
+    "test:integration": "npm run test:integration --workspace backend",
+    "db:migrate": "npm run db:migrate --workspace backend",
+    "seed:demo": "node scripts/seedDemoGame.js",
+    "test:display:browser": "node scripts/smokeDisplay.js",
+    "test:launch:browser": "node scripts/smokeDisplay.js --launch",
+    "test:controller:browser": "node scripts/smokeDisplay.js --controller",
+    "db:migrate:test": "npm run db:migrate:test --workspace backend"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.65.0",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.8",
+    "@vitest/coverage-istanbul": "5.1.0",
+    "@vitest/coverage-v8": "5.1.0",
+    "eslint": "10.14.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "eslint-plugin-react-refresh": "0.5.7",
+    "jsdom": "31.0.0",
+    "vitest": "5.1.0"
+  }
+}

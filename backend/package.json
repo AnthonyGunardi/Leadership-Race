@@ -1,0 +1,38 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Backend service for F1 Leadership Race",
+  "author": "AnthonyGunardi",
+  "engines": {
+    "node": "26.13.0",
+    "npm": "11.3.0"
+  },
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "build": "node --check src/server.js && node --check src/cli/bootstrapAdmin.js",
+    "start": "node src/server.js",
+    "admin:bootstrap": "node src/cli/bootstrapAdmin.js",
+    "db:migrate": "sequelize db:migrate",
+    "test:integration": "vitest run --config vitest.integration.config.js",
+    "db:migrate:test": "node -e \"process.env.NODE_ENV = 'test'; import('./src/config/database.js').then(m => { const db = process.env.DB_NAME || 'lr_test_default'; m.assertSafeTestSchema(db); console.log('Validated safe test target:', db); });\""
+  },
+  "dependencies": {
+    "bcrypt": "6.0.0",
+    "cors": "2.8.6",
+    "express": "5.3.0",
+    "express-rate-limit": "8.7.4",
+    "helmet": "8.3.0",
+    "mysql2": "3.24.6",
+    "sequelize": "6.37.8",
+    "socket.io": "4.8.4",
+    "winston": "3.19.0",
+    "winston-daily-rotate-file": "5.0.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "sequelize-cli": "6.6.5",
+    "socket.io-client": "4.8.4"
+  }
+}
