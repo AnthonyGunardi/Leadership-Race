@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { gameIdSchema, gameVersionSchema } from './gameSetup.js';
 
 const rollDiceSchema = gameVersionSchema.extend({
+  teamId: z.string().uuid().optional(),
   diceValue: z.number().int().min(1).max(6),
   expectedTurnNumber: z.number().int().min(1).optional(),
   controllerLeaseToken: z.string().regex(/^[a-f0-9]{64}$/)

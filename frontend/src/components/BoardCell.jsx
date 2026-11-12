@@ -35,11 +35,10 @@ function BoardCellComponent({
         <strong>{cell.number}</strong>
         <Icon name={cell.category} className="cell-icon" />
       </div>
-      <div className="cell-category">
+      <div className="cell-category" title={cell.title}>
         <span className="cell-category-full">{cell.categoryLabel}</span>
         <span className="cell-category-short" aria-hidden="true">{cell.categoryCode}</span>
       </div>
-      <span className="cell-title" title={cell.title}>{cell.title}</span>
       <div className="chip-dock">
         <TokenCluster
           occupants={cell.occupants}

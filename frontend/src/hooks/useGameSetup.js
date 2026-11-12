@@ -2,7 +2,11 @@ import { useState, useCallback } from 'react';
 import { useGameCommand, useGameConnectivity } from './useGames.js';
 import { describeBoardSource } from '../services/configuration.js';
 
-const colors = ['#b90500', '#1254a3', '#14723a', '#7347a8', '#a35b00', '#008078', '#a02f67', '#41506c', '#686000', '#71380e'];
+const colors = [
+  '#b90500', '#1254a3', '#14723a', '#7347a8', '#a35b00',
+  '#008078', '#a02f67', '#41506c', '#686000', '#71380e',
+  '#e11d48', '#0284c7', '#16a34a', '#d97706', '#475569'
+];
 
 /** Draft changes stay local until one versioned setup transaction commits them all. */
 export function useGameSetup({ session, snapshot, install, reload, currentStatus }) {
@@ -104,7 +108,7 @@ export function useGameSetup({ session, snapshot, install, reload, currentStatus
     updateTeam: (index, field, value) => setTeams((current) => current.map((team, at) => (
       at === index ? { ...team, [field]: value } : team
     ))),
-    addTeam: () => setTeams((current) => current.length < 10 ? [...current, {
+    addTeam: () => setTeams((current) => current.length < 15 ? [...current, {
       name: '', color: colors[current.length], sortOrder: current.length + 1
     }] : current),
     removeTeam: (index) => setTeams((current) => current.length > 2

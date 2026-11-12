@@ -47,6 +47,23 @@ describe('Board view service and Focus Mode projections', () => {
     expect(buildBoardView(null)).toBeNull();
   });
 
+  it('correctly clusters fifteen server-positioned teams at start with active team prioritized (3 visible, +12 hidden)', () => {
+    const teams = Array.from({ length: 15 }, (_, index) => ({
+      id: `team-${index + 1}`, code: `T${index + 1}`, sortOrder: index + 1, position: 0, name: `Tim ${index + 1}`
+    }));
+    const snapshot = {
+      data: {
+        game: { currentTeamId: 'team-15' },
+        teams,
+        boardCells: []
+      }
+    };
+    const view = buildBoardView(snapshot);
+    expect(view.start.chips.map((team) => team.code)).toEqual(['T15', 'T1', 'T2']);
+    expect(view.start).toMatchObject({ count: 15, hidden: 12 });
+    expect(view.teams).toHaveLength(15);
+  });
+
   it('separates motion from static occupancy: origin drops and destination does not double-render (AT-38, AT-45)', () => {
     const teams = [
       { id: 'team-1', code: 'T1', sortOrder: 1, position: 22, name: 'Tim Satu' }, // DB position committed to 22

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Transaction } from 'sequelize';
+import { Transaction, Op } from 'sequelize';
 import { defineGameSetup } from '../models/gameSetup.js';
 import { defineControllerLease } from '../models/controllerLease.js';
 import { defineTurn } from '../models/turn.js';
@@ -70,27 +70,73 @@ async function snapshotData(sequelize, transaction, game, publicOnly = false) {
   const cells = await BoardCell.findAll({ where: { gameId: game.id }, order: [['number', 'ASC']], transaction });
   const now = await databaseNow(sequelize, transaction);
 
-  const turnRecord = game.activeTurnId ? await Turn.findByPk(game.activeTurnId, { transaction }) : null;
+  const animatingTurns = await Turn.findAll({
+    where: {
+      gameId: game.id,
+      status: 'ANIMATING',
+      movementEndsAt: { [Op.gt]: now }
+    },
+    order: [['movementStartedAt', 'ASC']],
+    transaction
+  });
 
-  const turnStatus = !game.activeTurnId ? 'READY_FOR_ROLL' : (turnRecord ? turnRecord.status : 'READY_FOR_ROLL');
+  const activeMovements = animatingTurns.map((t) => ({
+    turnId: t.id,
+    teamId: t.teamId,
+    diceValue: t.diceValue,
+    from: t.fromPosition,
+    dicePath: t.dicePath,
+    penaltyPath: t.penaltyPath,
+    fullPath: t.fullPath,
+    landingCell: t.landingCell,
+    finalPosition: t.finalPosition,
+    movementStartsAt: t.movementStartedAt.toISOString(),
+    movementEndsAt: t.movementEndsAt.toISOString(),
+    stepDurationMs: t.stepDurationMs
+  }));
+  const activeMovement = activeMovements.length > 0 ? activeMovements[0] : null;
 
-  const activeMovement = (turnRecord && turnRecord.status === 'ANIMATING' && now < turnRecord.movementEndsAt) ? {
-    turnId: turnRecord.id,
-    teamId: turnRecord.teamId,
-    diceValue: turnRecord.diceValue,
-    from: turnRecord.fromPosition,
-    dicePath: turnRecord.dicePath,
-    penaltyPath: turnRecord.penaltyPath,
-    fullPath: turnRecord.fullPath,
-    landingCell: turnRecord.landingCell,
-    finalPosition: turnRecord.finalPosition,
-    movementStartsAt: turnRecord.movementStartedAt.toISOString(),
-    movementEndsAt: turnRecord.movementEndsAt.toISOString(),
-    stepDurationMs: turnRecord.stepDurationMs
-  } : null;
+  const awaitingTurns = await Turn.findAll({
+    where: { gameId: game.id, status: 'AWAITING_RESULT' },
+    order: [['turnNumber', 'ASC']],
+    transaction
+  });
 
-  const data = { game: gameDto(game), teams, boardCells: cells.map(cellDto),
-    turnStatus, activeMovement, leaderboard: calculateLeaderboard(teams) };
+  const pendingResults = awaitingTurns.map((t) => {
+    const cell = cells.find((c) => c.number === t.landingCell);
+    return {
+      turnId: t.id,
+      teamId: t.teamId,
+      cellNumber: cell ? cell.number : t.landingCell,
+      category: cell ? cell.category : 'ACTION',
+      title: cell ? cell.title : '',
+      successPoints: cell ? cell.successPoints : 0,
+      allowedMethods: ['BUTTON', 'MANUAL'],
+      defaultMethod: cell ? cell.defaultScoringMethod : 'BUTTON',
+      pointsPerUnit: cell ? cell.pointsPerUnit : null,
+      ...(cell?.instruction ? { instruction: cell.instruction } : {}),
+      ...(cell?.backupText ? { backupText: cell.backupText } : {}),
+      ...(cell?.durationText ? { durationText: cell.durationText } : {})
+    };
+  });
+  const pendingResult = pendingResults.length > 0 ? pendingResults[0] : null;
+
+  const turnRecord = game.activeTurnId
+    ? await Turn.findByPk(game.activeTurnId, { transaction })
+    : (animatingTurns[0] || awaitingTurns[0] || null);
+
+  const turnStatus = activeMovements.length > 0
+    ? 'ANIMATING'
+    : (pendingResults.length > 0 ? 'AWAITING_RESULT' : 'READY_FOR_ROLL');
+
+  const data = {
+    game: gameDto(game),
+    teams,
+    boardCells: cells.map(cellDto),
+    turnStatus,
+    activeMovement,
+    leaderboard: calculateLeaderboard(teams)
+  };
   if (publicOnly) return data;
 
   const lease = await defineControllerLease(sequelize).findByPk(game.id, { transaction });
@@ -144,24 +190,7 @@ async function snapshotData(sequelize, transaction, game, publicOnly = false) {
   }
 
 
-  let pendingResult = null;
-  if (turnRecord && turnRecord.status === 'AWAITING_RESULT') {
-    const cell = cells.find((c) => c.number === turnRecord.landingCell);
-    pendingResult = {
-      turnId: turnRecord.id,
-      teamId: turnRecord.teamId,
-      cellNumber: cell ? cell.number : turnRecord.landingCell,
-      category: cell ? cell.category : 'ACTION',
-      title: cell ? cell.title : '',
-      successPoints: cell ? cell.successPoints : 0,
-      allowedMethods: ['BUTTON', 'MANUAL'],
-      defaultMethod: cell ? cell.defaultScoringMethod : 'BUTTON',
-      pointsPerUnit: cell ? cell.pointsPerUnit : null,
-      ...(cell?.instruction ? { instruction: cell.instruction } : {}),
-      ...(cell?.backupText ? { backupText: cell.backupText } : {}),
-      ...(cell?.durationText ? { durationText: cell.durationText } : {})
-    };
-  }
+
 
   let finalResults = null;
   if (game.status === 'FINISHED') {
@@ -198,7 +227,7 @@ async function snapshotData(sequelize, transaction, game, publicOnly = false) {
   }
 
   return {
-    ...data, turn, pendingResult, lastTurn, controller: {
+    ...data, activeMovements, turn, pendingResult, pendingResults, lastTurn, controller: {
       holderUserId: leaseActive ? lease.holderUserId : null,
       expiresAt: leaseActive ? lease.expiresAt.toISOString() : null,
       version: lease ? safeInteger(lease.version) : 0

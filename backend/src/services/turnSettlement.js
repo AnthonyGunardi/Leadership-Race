@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
-import { Transaction } from 'sequelize';
+import { Transaction, Op } from 'sequelize';
 import { defineGameSetup } from '../models/gameSetup.js';
 import { defineTurn } from '../models/turn.js';
 import { defineAuthAudit } from '../models/authAudit.js';
@@ -35,17 +35,31 @@ export async function settleExpiredMovementIfDue({ sequelize, gameId, requestId 
         isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED
       }, async (transaction) => {
         const game = await Game.findByPk(gameId, { transaction, lock: transaction.LOCK.UPDATE });
-        if (!game || !game.activeTurnId) {
-          return { settled: false, reason: 'NO_ACTIVE_TURN' };
-        }
-
-        const turn = await Turn.findByPk(game.activeTurnId, { transaction, lock: transaction.LOCK.UPDATE });
-        if (!turn || turn.status !== 'ANIMATING') {
-          return { settled: false, reason: 'NOT_ANIMATING' };
+        if (!game) {
+          return { settled: false, reason: 'NO_GAME' };
         }
 
         const now = await databaseNow(sequelize, transaction);
-        if (turn.movementEndsAt > now) {
+
+        const anyAnimatingTurn = await Turn.findOne({
+          where: { gameId: game.id, status: 'ANIMATING' },
+          transaction
+        });
+        if (!anyAnimatingTurn) {
+          return { settled: false, reason: 'NOT_ANIMATING' };
+        }
+
+        const turn = await Turn.findOne({
+          where: {
+            gameId: game.id,
+            status: 'ANIMATING',
+            movementEndsAt: { [Op.lte]: now }
+          },
+          order: [['movementEndsAt', 'ASC']],
+          transaction,
+          lock: transaction.LOCK.UPDATE
+        });
+        if (!turn) {
           return { settled: false, reason: 'NOT_DUE' };
         }
 
@@ -153,7 +167,18 @@ export async function settleExpiredMovementIfDue({ sequelize, gameId, requestId 
         const currentIndex = allTeams.findIndex((t) => t.id === turn.teamId);
         const nextTeam = allTeams[(currentIndex + 1) % allTeams.length];
 
-        game.activeTurnId = null;
+        if (game.activeTurnId === turn.id) {
+          const nextActive = await Turn.findOne({
+            where: {
+              gameId: game.id,
+              id: { [Op.ne]: turn.id },
+              status: { [Op.in]: ['ANIMATING', 'AWAITING_RESULT'] }
+            },
+            order: [['turnNumber', 'DESC']],
+            transaction
+          });
+          game.activeTurnId = nextActive ? nextActive.id : null;
+        }
         game.currentTeamId = nextTeam ? nextTeam.id : turn.teamId;
         game.stateVersion = safeInteger(safeInteger(game.stateVersion) + 1);
         game.eventSequence = safeInteger(safeInteger(game.eventSequence) + 1);

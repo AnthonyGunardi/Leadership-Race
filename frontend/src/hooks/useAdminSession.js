@@ -110,9 +110,11 @@ export function useAdminSession(options = {}) {
   const setLoading = useAdminSessionStore((state) => state.setLoading);
   const setError = useAdminSessionStore((state) => state.setError);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async ({ silent = false } = {}) => {
     const operation = ++sessionOperation;
-    setLoading(true);
+    if (!silent) {
+      setLoading(true);
+    }
     try {
       const data = await apiRefreshSession();
       if (operation !== sessionOperation) {
@@ -128,6 +130,9 @@ export function useAdminSession(options = {}) {
       if (operation !== sessionOperation) {
         throw err;
       }
+      if (silent && err?.code === 'DISCONNECTED' && accessExpiresAt && new Date(accessExpiresAt).getTime() > Date.now()) {
+        throw err;
+      }
       if (err?.code === 'DISCONNECTED') {
         clearSession(
           { code: 'DISCONNECTED', message: err.message || 'Unable to connect to backend server' },
@@ -135,7 +140,7 @@ export function useAdminSession(options = {}) {
         );
       } else {
         clearSession(
-          err?.status === 401
+          err?.status === 401 && !silent
             ? null
             : { code: err?.code || 'UNAUTHENTICATED', message: err?.message || 'Session has expired' },
           'UNAUTHENTICATED'
@@ -143,7 +148,7 @@ export function useAdminSession(options = {}) {
       }
       throw err;
     }
-  }, [clearSession, setLoading, setSession]);
+  }, [accessExpiresAt, clearSession, setLoading, setSession]);
 
   const login = useCallback(async ({ email, password }) => {
     const operation = ++sessionOperation;
@@ -196,16 +201,40 @@ export function useAdminSession(options = {}) {
     setError(null);
   }, [setError]);
 
-  // Access expiry is absolute; ordinary activity never rotates refresh credentials.
+  // Proactive silent auto-refresh: rotates refresh token before access token expires
   useEffect(() => {
     if (status !== 'AUTHENTICATED' || !accessExpiresAt) {
       return;
     }
-    const timer = setTimeout(() => {
-      clearSession({ code: 'UNAUTHENTICATED', message: 'Session has expired, please log in again' });
-    }, Math.max(0, new Date(accessExpiresAt).getTime() - Date.now()));
-    return () => clearTimeout(timer);
-  }, [accessExpiresAt, clearSession, status]);
+
+    let active = true;
+    const remainingMs = new Date(accessExpiresAt).getTime() - Date.now();
+    // Schedule refresh 1 minute before expiry, or halfway if remaining time is short
+    const leadTimeMs = Math.min(60 * 1000, Math.max(0, Math.floor(remainingMs / 2)));
+    const delay = Math.max(0, remainingMs - leadTimeMs);
+
+    const timer = setTimeout(async () => {
+      if (!active) {
+        return;
+      }
+      try {
+        await refresh({ silent: true });
+      } catch (err) {
+        if (!active) {
+          return;
+        }
+        // If refresh fails: if token has expired or server explicitly rejected refresh (401), end session
+        if (err?.status === 401 || new Date(accessExpiresAt).getTime() <= Date.now()) {
+          clearSession({ code: 'UNAUTHENTICATED', message: 'Session has expired, please log in again' });
+        }
+      }
+    }, delay);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [accessExpiresAt, clearSession, refresh, status]);
 
   // Read-only liveness checks detect revoked/disabled accounts without rotating credentials.
   useEffect(() => {

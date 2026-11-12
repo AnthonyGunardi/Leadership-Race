@@ -66,11 +66,11 @@
   z-index: 20;
 }
 
-.category-ACTION { --tile-face: #c6e9b5; --tile-rim: #5b9254; --tile-ink: #174323; }
-.category-REWARD { --tile-face: #e5cef5; --tile-rim: #a574c0; --tile-ink: #4c2169; }
-.category-RACE_STRENGTH { --tile-face: #ffdf91; --tile-rim: #c28a24; --tile-ink: #603e04; }
-.category-PIT_STOP { --tile-face: #c2e3f5; --tile-rim: #5f9fbe; --tile-ink: #154865; }
-.category-INDISIPLINER { --tile-face: #facbc8; --tile-rim: #c87772; --tile-ink: #7a2424; }
+.category-ACTION { --tile-face: #bbf7d0; --tile-rim: #16a34a; --tile-ink: #14532d; }
+.category-REWARD { --tile-face: #e9d5ff; --tile-rim: #9333ea; --tile-ink: #581c87; }
+.category-RACE_STRENGTH { --tile-face: #fde68a; --tile-rim: #d97706; --tile-ink: #78350f; }
+.category-PIT_STOP { --tile-face: #bae6fd; --tile-rim: #0284c7; --tile-ink: #0c4a6e; }
+.category-INDISIPLINER { --tile-face: #fecdd3; --tile-rim: #e11d48; --tile-ink: #881337; }
 .category-UNCONFIGURED { --tile-face: #e0e5ec; --tile-rim: #87909f; --tile-ink: #374151; }
 .board-cell:hover { border-color: var(--tile-ink); }
 .board-cell::after { content: ''; position: absolute; right: -7px; top: 48%; width: 4px; height: 4px; border-top: 1px solid #505c6d; border-right: 1px solid #505c6d; transform: rotate(45deg); }
@@ -81,8 +81,8 @@
 .cell-heading { display: flex; justify-content: space-between; align-items: center; gap: 2px; }
 .cell-heading strong { font-size: clamp(1.35rem, 1.6vw, 2rem); font-weight: 850; line-height: 1; letter-spacing: -0.03em; }
 .cell-icon { width: clamp(1.2rem, 1.5vw, 1.8rem); height: clamp(1.2rem, 1.5vw, 1.8rem); }
-.cell-category { font-size: clamp(0.7rem, 0.85vw, 1rem); font-weight: 800; line-height: 1.1; }
-.cell-title { font-size: clamp(0.65rem, 0.7vw, 0.85rem); overflow-wrap: anywhere; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cell-category { font-size: clamp(0.85rem, 1.1vw, 1.35rem); font-weight: 800; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cell-title { display: none; }
 .cell-category-short { display: none; }
 .chip-dock { display: flex; gap: 2px; min-height: clamp(1.5rem, 2vw, 2.4rem); align-items: end; margin-top: auto; }
 .chip-dock .cluster-chips-row { flex-wrap: wrap; row-gap: 4px; max-width: 100%; }
@@ -194,11 +194,6 @@
   z-index: 20;
 }
 
-.board-cell.is-bounce-point {
-  border-color: var(--display-gold);
-  box-shadow: inset 0 0 12px rgba(245, 158, 11, 0.4);
-}
-
 .board-cell.is-penalty-step {
   border-color: var(--display-red);
   box-shadow: inset 0 0 10px rgba(185, 5, 0, 0.25);
@@ -235,18 +230,8 @@
   transition: transform 0.15s ease-out;
 }
 
-.movement-overlay-slot.is-bouncing .movement-overlay-token {
-  animation: bounce-turnaround 0.45s ease-in-out;
-}
-
 .movement-overlay-slot.is-retreating .movement-overlay-token {
   animation: penalty-retreat 0.45s ease-in-out;
-}
-
-@keyframes bounce-turnaround {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.25) rotate(-10deg); }
-  100% { transform: scale(1); }
 }
 
 @keyframes penalty-retreat {
@@ -281,13 +266,18 @@
   border-bottom: 1px solid #dce1e8;
   padding-bottom: 0.65rem;
 }
+.display-board .leaderboard-table-container {
+  max-height: 100%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
 .display-board .leaderboard-table {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
 }
 .display-board .leaderboard-table tr {
-  height: clamp(2rem, 3.8vh, 2.8rem);
+  height: clamp(1.75rem, 3vh, 2.35rem);
 }
 .display-board .leaderboard-table th, .display-board .leaderboard-table td {
   padding: 0.35rem 0.25rem;
@@ -366,8 +356,8 @@
   .start-dock { padding-block: 0.35rem; }
   .start-dock-label::before { top: -3px; width: 1.3rem; height: 1.3rem; }
   .start-dock .racing-token { width: 1.5rem; height: 1.5rem; font-size: 0.75rem; border-width: 2px; }
-  .display-board .leaderboard-table tr { height: 1.75rem; }
-  .display-board .leaderboard-table td { padding-block: 0.2rem; line-height: 1.2; }
+  .display-board .leaderboard-table tr { height: 1.55rem; }
+  .display-board .leaderboard-table td { padding-block: 0.15rem; line-height: 1.15; }
   .display-board .leaderboard-table th { padding-block: 0.25rem; }
   .display-board .leaderboard-table .team-code { padding: 0.15rem 0.25rem; line-height: 1.1; }
   .display-board .leaderboard-panel { padding: 0.75rem; }

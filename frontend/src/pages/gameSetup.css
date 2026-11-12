@@ -197,12 +197,12 @@
   border-radius: 3px;
   display: inline-block;
 }
-.cell-category-tag.category-ACTION { background: #194b38; border: 1px solid #6aa989; color: #a7edbf; }
-.cell-category-tag.category-REWARD { background: #432c60; border: 1px solid #ad88cf; color: #dfc2fa; }
-.cell-category-tag.category-RACE_STRENGTH { background: #593f18; border: 1px solid #c4a06a; color: #ffdc9c; }
-.cell-category-tag.category-PIT_STOP { background: #16475e; border: 1px solid #6aa8c3; color: #b5e7fc; }
-.cell-category-tag.category-INDISIPLINER { background: #5b2a31; border: 1px solid #cb8a84; color: #ffc1b8; }
-.cell-category-tag.category-UNCONFIGURED { background: #29323e; border: 1px solid #78889b; color: #d5deea; }
+.cell-category-tag.category-ACTION { background: #0b4e2d; border: 1px solid #10b981; color: #34d399; }
+.cell-category-tag.category-REWARD { background: #401875; border: 1px solid #a855f7; color: #e9d5ff; }
+.cell-category-tag.category-RACE_STRENGTH { background: #613204; border: 1px solid #f59e0b; color: #fde68a; }
+.cell-category-tag.category-PIT_STOP { background: #0a4d70; border: 1px solid #06b6d4; color: #67e8f9; }
+.cell-category-tag.category-INDISIPLINER { background: #671424; border: 1px solid #f43f5e; color: #fda4af; }
+.cell-category-tag.category-UNCONFIGURED { background: #222933; border: 1px solid #64748b; color: #cbd5e1; }
 
 .scoring-guidance {
   font-size: 0.9rem;

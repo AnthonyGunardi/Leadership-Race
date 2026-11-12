@@ -25,7 +25,7 @@ Sistem dirancang dengan arsitektur **single operational game**, sinkronisasi *re
 
 ## Gambaran Sistem & Prinsip Utama
 
-F1 Leadership Race mengelola kompetisi papan 50 kotak untuk **2–10 tim**. Dadu fisik dilempar secara manual di lapangan oleh peserta/fasilitator, lalu Super Admin memasukkan angka 1–6 ke aplikasi. Sistem menghitung lintasan langkah demi langkah secara aman di sisi server, menangani pantulan (*bounce*) di kotak 50, mengeksekusi penalti kotak Indisipliner, dan menyiarkan animasi gerakan ke seluruh layar display dan konsol admin secara *real-time*.
+F1 Leadership Race mengelola kompetisi papan 50 kotak untuk **2–15 tim**. Dadu fisik dilempar secara manual di lapangan oleh peserta/fasilitator, lalu Super Admin memasukkan angka 1–6 ke aplikasi. Sistem menghitung lintasan langkah demi langkah secara aman di sisi server, menangani sirkuit wrap-around (*loop*) di kotak 50, mengeksekusi penalti kotak Indisipliner, dan menyiarkan animasi gerakan ke seluruh layar display dan konsol admin secara *real-time*.
 
 > [!IMPORTANT]
 > **Prinsip Utama Produk (Invariants):**
@@ -273,7 +273,7 @@ Konfigurasi dibaca oleh [`backend/src/config/environment.js`](backend/src/config
 ```
 [Start: Kotak 0] ──▶ [Kotak 1..10] ──(Zigzag)──▶ [Kotak 41..50]
                            ▲                            │
-                           │       Bounce Pantulan       │
+                           │   Circuit Wrap-Around      │
                            └────────────────────────────┘
 ```
 
@@ -281,9 +281,9 @@ Konfigurasi dibaca oleh [`backend/src/config/environment.js`](backend/src/config
    - 50 kotak disusun zigzag: Baris 1 (1–10 ke kanan), Baris 2 (20–11 ke kiri), Baris 3 (21–30 ke kanan), Baris 4 (40–31 ke kiri), Baris 5 (41–50 ke kanan).
    - Kategori kotak: **Action** (15), **Reward** (10), **Race Strength** (9), **Pit Stop** (8), dan **Indisipliner** (8).
 
-2. **Aturan Pergerakan & Pantulan (Bounce):**
+2. **Aturan Pergerakan & Sirkuit Wrap-Around (Loop):**
    - Posisi awal seluruh tim adalah Kotak 0.
-   - Jika lemparan dadu melebihi Kotak 50, sisa langkah berbalik arah (*bounce back*). Contoh: Berada di kotak 48 + dadu 5 → maju 2 langkah ke kotak 50, mundur 3 langkah ke kotak 47.
+   - Jika lemparan dadu melebihi Kotak 50, pergerakan melanjutkan putaran sirkuit baru (*circuit wrap-around*) mulai dari kotak 1. Contoh: Berada di kotak 48 + dadu 6 → maju ke kotak 49, 50, lalu lanjut ke kotak 1, 2, 3, 4 (landing di kotak 4).
 
 3. **Penalti Kotak Indisipliner:**
    - Kotak Indisipliner langsung mengeksekusi penalti mundur otomatis sesuai konfigurasi kotak (misal: mundur 3 langkah).

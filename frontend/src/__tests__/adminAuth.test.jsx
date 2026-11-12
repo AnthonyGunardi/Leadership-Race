@@ -526,20 +526,55 @@ describe('Admin Authentication Client Service and Session Hook (LR-025)', () => 
       }
     });
 
-    it('ends authentication at access expiry without refreshing or extending it (LR-027)', async () => {
+    it('silently auto-refreshes session before access token expires', async () => {
       vi.useFakeTimers();
       try {
         useAdminSessionStore.getState().setSession({
           user: { id: 'u-expiry', role: 'SUPER_ADMIN' }, accessToken: 'expires-soon',
           accessExpiresAt: new Date(Date.now() + 1000).toISOString()
         });
-        globalThis.fetch = vi.fn();
+        globalThis.fetch = vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: {
+              accessToken: 'refreshed-silent-token',
+              accessExpiresAt: new Date(Date.now() + 900000).toISOString(),
+              user: { id: 'u-expiry', role: 'SUPER_ADMIN' }
+            }
+          })
+        });
+        const { result, unmount } = renderHook(() => useAdminSession({ autoInit: false }));
+        await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+        expect(globalThis.fetch).toHaveBeenCalledWith(
+          expect.stringContaining('/api/v1/auth/refresh'),
+          expect.anything()
+        );
+        expect(result.current.isAuthenticated).toBe(true);
+        expect(result.current.accessToken).toBe('refreshed-silent-token');
+        unmount();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('ends authentication when auto-refresh fails on expired or rejected refresh cookie (LR-027)', async () => {
+      vi.useFakeTimers();
+      try {
+        useAdminSessionStore.getState().setSession({
+          user: { id: 'u-expiry', role: 'SUPER_ADMIN' }, accessToken: 'expires-soon',
+          accessExpiresAt: new Date(Date.now() + 1000).toISOString()
+        });
+        globalThis.fetch = vi.fn().mockResolvedValue({
+          ok: false,
+          status: 401,
+          json: async () => ({ error: { code: 'UNAUTHENTICATED', message: 'Session has expired' } })
+        });
         const { result, unmount } = renderHook(() => useAdminSession({ autoInit: false }));
         await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
         expect(result.current.isAuthenticated).toBe(false);
         expect(result.current.accessToken).toBeNull();
         expect(result.current.error.code).toBe('UNAUTHENTICATED');
-        expect(globalThis.fetch).not.toHaveBeenCalled();
         unmount();
       } finally {
         vi.useRealTimers();

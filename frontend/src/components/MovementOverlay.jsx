@@ -19,12 +19,11 @@ export function MovementOverlay({ timeline, team, cells }) {
     return null;
   }
 
-  const bounceClass = timeline.phase === 'BOUNCING' ? 'is-bouncing' : '';
   const penaltyClass = timeline.phase === 'PENALTY' ? 'is-retreating' : '';
 
   return (
     <div
-      className={`movement-overlay-slot ${bounceClass} ${penaltyClass}`}
+      className={`movement-overlay-slot ${penaltyClass}`}
       style={{ gridRow: targetCell.row, gridColumn: targetCell.column }}
       aria-live="polite"
       role="status"

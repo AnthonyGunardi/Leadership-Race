@@ -46,7 +46,7 @@ Kolom terakhir menunjuk test yang perlu dilihat/dijalankan, bukan status lulus t
 | FR-01 | Login/logout/refresh, session, role | adminSessions/adminAuth; adminIdentity integration; E2E auth |
 | FR-02 | Satu game, tim/poin, Mulai bermain | singleGame/gameSetup/gamePreflight; singleGame/simpleAdmin/gameLaunch tests |
 | FR-03 | Dadu fisik 1–6, round-robin | movement/turnCommands; movement/turnRoll tests |
-| FR-04 | Path/bounce/penalti tunggal server | movement; movement/turnRoll/displayBoardMotion tests |
+| FR-04 | Path/sirkuit wrap-around/penalti tunggal server | movement; movement/turnRoll/displayBoardMotion tests |
 | FR-05 | BUTTON SUCCESS/FAIL | turnCommands; turnResult/challengeScoring tests |
 | FR-06 | MANUAL integer 0–200 | validation/turn; turnValidation/turnResult/challengeScoring tests |
 | FR-07 | Challenge/Reward di luar aplikasi | gamePreflight/turnCommands; preflight/result tests tanpa narasi wajib |

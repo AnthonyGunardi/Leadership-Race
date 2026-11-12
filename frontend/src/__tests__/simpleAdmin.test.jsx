@@ -315,3 +315,16 @@ it('finishes game manually with confirmation and displays winners', async () => 
   expect(await screen.findByText(/Game finished \(FINISHED\)/)).toBeInTheDocument();
   expect(screen.getByText(/Merah \(T1\)/)).toBeInTheDocument();
 });
+
+it('allows adding up to 15 teams with valid colors and disables Add team button at 15', async () => {
+  mount();
+  const addTeamBtn = await screen.findByRole('button', { name: 'Add team' });
+  expect(screen.getByText('2–15 teams. Order below determines turn order.')).toBeInTheDocument();
+  for (let i = 3; i <= 15; i++) {
+    expect(addTeamBtn).toBeEnabled();
+    fireEvent.click(addTeamBtn);
+    expect(screen.getByLabelText(`Team name T${i}`)).toBeInTheDocument();
+  }
+  expect(addTeamBtn).toBeDisabled();
+  expect(screen.getByText('15 teams')).toBeInTheDocument();
+});

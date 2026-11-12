@@ -51,7 +51,7 @@ describe('Movement timeline service', () => {
     expect(normalizeMovement(null)).toBeNull();
   });
 
-  it('detects bounce (AT-05, AT-46) and penalty flags (AT-07, AT-47)', () => {
+  it('detects wrap-around and penalty flags (AT-05, AT-46, AT-07, AT-47)', () => {
     const normal = normalizeMovement({
       turnId: 't1',
       from: 18,
@@ -64,18 +64,18 @@ describe('Movement timeline service', () => {
     });
     expect(getMovementFlags(normal)).toEqual({ isBounce: false, hasPenalty: false });
 
-    const bounce = normalizeMovement({
+    const wrapAround = normalizeMovement({
       turnId: 't2',
       from: 48,
-      diceValue: 4,
-      dicePath: [49, 50, 49, 48],
-      fullPath: [49, 50, 49, 48],
-      landingCell: 48,
-      finalPosition: 48,
+      diceValue: 6,
+      dicePath: [49, 50, 1, 2, 3, 4],
+      fullPath: [49, 50, 1, 2, 3, 4],
+      landingCell: 4,
+      finalPosition: 4,
       startAt: '2026-11-10T10:00:00.000Z',
-      endAt: '2026-11-10T10:00:01.800Z'
+      endAt: '2026-11-10T10:00:02.700Z'
     });
-    expect(getMovementFlags(bounce)).toEqual({ isBounce: true, hasPenalty: false });
+    expect(getMovementFlags(wrapAround)).toEqual({ isBounce: false, hasPenalty: false });
 
     const penalty = normalizeMovement({
       turnId: 't3',
@@ -141,34 +141,39 @@ describe('Movement timeline service', () => {
     expect(end.currentCell).toBe(22);
   });
 
-  it('reports MEMANTUL during bounce movement (AT-46)', () => {
+  it('reports BERGERAK during circuit wrap-around movement (AT-46)', () => {
     const startMs = Date.parse('2026-11-10T10:00:00.000Z');
-    const bounceMovement = normalizeMovement({
-      turnId: 't-bounce',
+    const wrapMovement = normalizeMovement({
+      turnId: 't-wrap',
       from: 48,
-      diceValue: 4,
-      dicePath: [49, 50, 49, 48],
-      fullPath: [49, 50, 49, 48],
-      landingCell: 48,
-      finalPosition: 48,
+      diceValue: 6,
+      dicePath: [49, 50, 1, 2, 3, 4],
+      fullPath: [49, 50, 1, 2, 3, 4],
+      landingCell: 4,
+      finalPosition: 4,
       startAt: new Date(startMs).toISOString(),
-      endAt: new Date(startMs + 4 * 450).toISOString(),
+      endAt: new Date(startMs + 6 * 450).toISOString(),
       stepDurationMs: 450
     });
 
-    const s0 = calculateMovementTimeline(bounceMovement, startMs + 100);
+    const s0 = calculateMovementTimeline(wrapMovement, startMs + 100);
     expect(s0.currentCell).toBe(49);
-    expect(s0.isBounce).toBe(true);
-    expect(s0.statusLabel).toBe('MEMANTUL');
+    expect(s0.isBounce).toBe(false);
+    expect(s0.statusLabel).toBe('BERGERAK');
 
-    const s1 = calculateMovementTimeline(bounceMovement, startMs + 500);
+    const s1 = calculateMovementTimeline(wrapMovement, startMs + 500);
     expect(s1.currentCell).toBe(50);
-    expect(s1.statusLabel).toBe('MEMANTUL');
+    expect(s1.statusLabel).toBe('BERGERAK');
 
-    const s2 = calculateMovementTimeline(bounceMovement, startMs + 950);
-    expect(s2.currentCell).toBe(49);
-    expect(s2.phase).toBe('BOUNCING');
-    expect(s2.statusLabel).toBe('MEMANTUL');
+    const s2 = calculateMovementTimeline(wrapMovement, startMs + 950);
+    expect(s2.currentCell).toBe(1);
+    expect(s2.phase).toBe('MOVING');
+    expect(s2.statusLabel).toBe('BERGERAK');
+
+    const s5 = calculateMovementTimeline(wrapMovement, startMs + 2300);
+    expect(s5.currentCell).toBe(4);
+    expect(s5.phase).toBe('MOVING');
+    expect(s5.statusLabel).toBe('BERGERAK');
   });
 
   it('reports MUNDUR during penalty retreat phase (AT-47)', () => {

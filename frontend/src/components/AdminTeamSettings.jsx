@@ -3,7 +3,7 @@ export function AdminTeamSettings({ setup, busy }) {
   return <section id="admin-teams" aria-labelledby="simple-teams-title" className="simple-section">
     <details open={setup.editable} onInvalidCapture={(event) => { event.currentTarget.open = true; }}>
       <summary><h2 id="simple-teams-title">Teams</h2><span>{setup.teams.length} teams</span></summary>
-      <p className="form-hint">2–10 teams. Order below determines turn order.</p>
+      <p className="form-hint">2–15 teams. Order below determines turn order.</p>
       <fieldset disabled={setup.disabled || busy}>
         <legend className="visually-hidden">Team settings</legend>
         <ol className="simple-team-editors">
@@ -27,7 +27,7 @@ export function AdminTeamSettings({ setup, busy }) {
             </div>
           </li>)}
         </ol>
-        <button type="button" className="secondary" disabled={setup.teams.length >= 10}
+        <button type="button" className="secondary" disabled={setup.teams.length >= 15}
           onClick={setup.addTeam}>Add team</button>
       </fieldset>
       {!setup.editable && <p className="form-hint">Teams and points are locked during game. Reset to configure them again.</p>}

@@ -45,12 +45,8 @@ export function normalizeMovement(raw) {
 /** Determines bounce or penalty characteristics of a movement. */
 export function getMovementFlags(movement) {
   if (!movement) return { isBounce: false, hasPenalty: false };
-  const isBounce = Boolean(
-    (movement.dicePath && movement.dicePath.includes(50) && movement.landingCell < 50)
-      || (movement.from + (movement.diceValue || 0) > 50)
-  );
   const hasPenalty = Boolean(movement.penaltyPath && movement.penaltyPath.length > 0);
-  return { isBounce, hasPenalty };
+  return { isBounce: false, hasPenalty };
 }
 
 /**
@@ -101,7 +97,7 @@ export function calculateMovementTimeline(movement, serverNowMs) {
       currentCell: movement.from,
       isBounce,
       hasPenalty,
-      statusLabel: isBounce ? 'MEMANTUL' : (hasPenalty ? 'MUNDUR' : 'BERSIAP'),
+      statusLabel: hasPenalty ? 'MUNDUR' : 'BERSIAP',
       progress: 0
     };
   }
@@ -118,11 +114,6 @@ export function calculateMovementTimeline(movement, serverNowMs) {
   if (hasPenalty && stepIndex >= movement.dicePath.length) {
     phase = 'PENALTY';
     statusLabel = 'MUNDUR';
-  } else if (isBounce && stepIndex >= movement.dicePath.indexOf(50)) {
-    phase = 'BOUNCING';
-    statusLabel = 'MEMANTUL';
-  } else if (isBounce) {
-    statusLabel = 'MEMANTUL';
   }
 
   return {

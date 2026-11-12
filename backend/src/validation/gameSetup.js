@@ -7,7 +7,7 @@ const points = z.number().int().min(0).max(2147483647);
 const text = z.string().trim().max(4000).nullable().default(null);
 const teamSchema = z.strictObject({
   id: gameIdSchema.optional(), name: z.string().trim().min(1).max(100),
-  color: z.string().regex(/^#[a-fA-F0-9]{6}$/), sortOrder: z.number().int().min(1).max(10)
+  color: z.string().regex(/^#[a-fA-F0-9]{6}$/), sortOrder: z.number().int().min(1).max(15)
 });
 const cellSchema = z.strictObject({
   id: gameIdSchema.optional(), number: z.number().int().min(1).max(50),
@@ -55,7 +55,7 @@ const boardImportSchema = z.strictObject({ expectedStateVersion: safeCounter, co
 }) });
 export const setupGameSchema = z.strictObject({
   name: currentGameSchema.shape.name, expectedStateVersion: safeCounter,
-  teams: z.array(teamSchema).min(2).max(10), boardCells: z.array(cellSchema).max(50)
+  teams: z.array(teamSchema).min(2).max(15), boardCells: z.array(cellSchema).max(50)
 }).superRefine((setup, context) => {
   const names = setup.teams.map((team) => team.name.toLocaleLowerCase('id'));
   const orders = setup.teams.map((team) => team.sortOrder);

@@ -90,19 +90,36 @@ export function useControllerLease(session, gameId, { autoAcquire = false } = {}
   }
 
   const turnStatus = query.data?.data?.turnStatus ?? 'READY_FOR_ROLL';
-  const currentTeam = query.data?.data?.teams?.find((t) => t.id === query.data?.data?.game?.currentTeamId) ?? null;
+  const teams = query.data?.data?.teams ?? [];
+  const currentTeam = teams.find((t) => t.id === query.data?.data?.game?.currentTeamId) ?? null;
   const activeMovement = query.data?.data?.activeMovement ?? null;
+  const activeMovements = query.data?.data?.activeMovements ?? (activeMovement ? [activeMovement] : []);
   const turn = query.data?.data?.turn ?? null;
-  const canRoll = ownsLease && status === 'RUNNING' && turnStatus === 'READY_FOR_ROLL' && !disabled;
+  const pendingResults = query.data?.data?.pendingResults
+    ?? (query.data?.data?.pendingResult ? [query.data.data.pendingResult] : []);
+  const pendingResult = pendingResults[0] ?? query.data?.data?.pendingResult ?? null;
+
+  const pendingTeamIds = new Set(pendingResults.map((p) => p.teamId));
+  const animatingTeamIds = new Set(activeMovements.map((m) => m.teamId));
+
+  const canRollAny = ownsLease && status === 'RUNNING' && !disabled;
+  const canRollTeam = (teamId) => canRollAny && !pendingTeamIds.has(teamId) && !animatingTeamIds.has(teamId);
+  const canRoll = canRollAny && (currentTeam ? canRollTeam(currentTeam.id) : true);
 
   /** Physical dice input (1-6) committed atomically with pure engine movement calculation. */
-  function roll(diceValue) {
-    if (!canRoll) return;
+  function roll(diceOrObj, maybeTeamId) {
+    if (!canRollAny) return;
+    const diceValue = typeof diceOrObj === 'object' && diceOrObj !== null ? diceOrObj.diceValue : diceOrObj;
+    const targetTeamId = typeof diceOrObj === 'object' && diceOrObj !== null
+      ? diceOrObj.teamId
+      : (maybeTeamId || currentTeam?.id);
+
     command.execute({
       path: `/${gameId}/turns/roll`,
       method: 'POST',
       body: {
         diceValue,
+        ...(targetTeamId ? { teamId: targetTeamId } : {}),
         expectedStateVersion: query.data.meta.stateVersion,
         expectedTurnNumber: (query.data?.data?.game?.turnNumber ?? 0) + 1,
         controllerLeaseToken: token.current
@@ -110,16 +127,16 @@ export function useControllerLease(session, gameId, { autoAcquire = false } = {}
     });
   }
 
-  const pendingResult = query.data?.data?.pendingResult ?? null;
   const leaderboard = query.data?.data?.leaderboard ?? [];
   const finalResults = query.data?.data?.finalResults ?? null;
-  const canSubmitResult = allowed && status === 'RUNNING' && turnStatus === 'AWAITING_RESULT' && !disabled && Boolean(pendingResult);
+  const canSubmitResult = allowed && status === 'RUNNING' && !disabled && (pendingResults.length > 0 || Boolean(pendingResult));
 
   /** Submits challenge scoring result (BUTTON or MANUAL) for an awaiting turn. */
-  function submitResult({ scoringMethod = 'BUTTON', outcome, points, note }) {
-    if (!canSubmitResult || !turn?.id) return;
+  function submitResult({ turnId: targetTurnId, scoringMethod = 'BUTTON', outcome, points, note }) {
+    const effectiveTurnId = targetTurnId || pendingResult?.turnId || turn?.id;
+    if (!canSubmitResult || !effectiveTurnId) return;
     command.execute({
-      path: `/${gameId}/turns/${turn.id}/result`,
+      path: `/${gameId}/turns/${effectiveTurnId}/result`,
       method: 'POST',
       body: {
         scoringMethod,
@@ -191,8 +208,8 @@ export function useControllerLease(session, gameId, { autoAcquire = false } = {}
     query, command, online, allowed, status, active, ownsLease, disabled, remainingSeconds,
     holder: ownsLease ? 'Anda' : controller?.holderUserId, acquire, takeOver, reload,
     setupPath: `/admin/games/${gameId}/setup`,
-    turnStatus, currentTeam, activeMovement, turn, canRoll, roll,
-    pendingResult, leaderboard, canSubmitResult, submitResult,
+    turnStatus, currentTeam, activeMovement, activeMovements, turn, canRoll, canRollAny, canRollTeam, roll,
+    pendingResult, pendingResults, leaderboard, canSubmitResult, submitResult,
     pauseGame, resumeGame, finishGame, finalResults,
     lastTurn, lastTurnTeam, canVoid, voidTurn
   };

@@ -34,7 +34,7 @@
 
 ## 1. Gambaran produk
 
-**F1 Leadership Race** adalah aplikasi web untuk membantu panitia menjalankan board game tim dalam acara tatap muka. Papan terdiri dari **50 kotak** (5 × 10) berurutan zigzag, diikuti oleh **2–10 tim**. Dadu dilempar secara fisik; Super Admin memasukkan hasil 1–6 ke aplikasi. Backend menghitung lintasan, menyimpan posisi akhir, lalu menyinkronkan animasi langkah demi langkah pada seluruh browser admin dan layar publik.
+**F1 Leadership Race** adalah aplikasi web untuk membantu panitia menjalankan board game tim dalam acara tatap muka. Papan terdiri dari **50 kotak** (5 × 10) berurutan zigzag, diikuti oleh **2–15 tim**. Dadu dilempar secara fisik; Super Admin memasukkan hasil 1–6 ke aplikasi. Backend menghitung lintasan, menyimpan posisi akhir, lalu menyinkronkan animasi langkah demi langkah pada seluruh browser admin dan layar publik.
 
 Jika tim berhenti pada kategori Action, Reward, Race Strength, atau Pit Stop, panitia mengelola aktivitas di lapangan dan Super Admin hanya memasukkan **hasil poin** melalui salah satu dari dua metode: **Sukses/Gagal** atau **Input Poin Manual**. Kotak Indisipliner menjalankan hukuman langkah mundur otomatis tanpa form poin. Game berakhir ketika Super Admin menjalankan **Finish Game**, dan pemenang ditentukan dari akumulasi skor tertinggi, bukan posisi kotak terjauh.
 
@@ -45,7 +45,7 @@ Jika tim berhenti pada kategori Action, Reward, Race Strength, atau Pit Stop, pa
 | Aspek | Ketentuan |
 |---|---|
 | Jumlah kotak | 50 (5 baris × 10 kolom) |
-| Jumlah tim | 2–10 |
+| Jumlah tim | 2–15 |
 | Kategori | 15 Action, 10 Reward, 9 Race Strength, 8 Pit Stop, 8 Indisipliner |
 | Dadu | Fisik; hasil 1–6 dimasukkan admin |
 | Giliran | Round-robin berdasarkan urutan tim |
@@ -60,11 +60,11 @@ Nama kotak dan nilai default pada dokumen ini mengacu pada sumber workbook yang 
 
 ### 2.1 Termasuk dalam aplikasi
 
-- Login dan session Super Admin; satu game operasional dengan 2–10 tim, warna/urutan, poin per kotak dan reset.
+- Login dan session Super Admin; satu game operasional dengan 2–15 tim, warna/urutan, poin per kotak dan reset.
   `/admin/games` menyatukan pengaturan, dadu dan penilaian; editor 50 kotak lengkap hanya pada URL kompatibilitas.
 - Kontrol input dadu fisik, movement server-side, pantulan di kotak 50, dan penalti otomatis kotak Indisipliner.
 - Input poin Super Admin melalui **BUTTON (Sukses/Gagal)** atau **MANUAL (angka poin)** untuk semua kategori selain Indisipliner.
-- Display publik minimal: judul game, board 2.5D dengan chip T1–T10/clustering/animasi, dan leaderboard di sampingnya; final result tetap tersedia.
+- Display publik minimal: judul game, board 2.5D dengan chip T1–T15/clustering/animasi, dan leaderboard di sampingnya; final result tetap tersedia.
 - Sinkronisasi realtime, snapshot/reconnect, histori transaksi, audit, koreksi skor, dan ekspor CSV.
 - Kontrol game oleh satu Active Controller untuk input dadu, sementara akun Super Admin lain dapat mencatat poin pada giliran yang menunggu hasil.
 
@@ -111,9 +111,9 @@ Urutan logis permainan selalu **1 sampai 50**, tidak ditentukan oleh DOM order. 
 - Hanya **landing cell setelah semua langkah dadu** yang memicu scoring atau penalti; kotak yang sekadar dilewati tidak memicu efek.
 - Perubahan konfigurasi board/tim tidak diizinkan saat game `RUNNING`.
 
-### 3.3 Movement, bounce, dan penalti
+### 3.3 Movement, sirkuit wrap-around, dan penalti
 
-**Movement normal:** hasil dadu 1–6 membentuk `dice_path` per kotak. Jika melampaui kotak 50, bidak memantul dan sisa langkah dihitung mundur. Contoh posisi 48, dadu 4 menghasilkan `[49,50,49,48]`; posisi 50, dadu 3 menghasilkan `[49,48,47]`.
+**Movement normal:** hasil dadu 1–6 membentuk `dice_path` per kotak secara maju. Jika melampaui kotak 50, pergerakan tidak memantul (*bounce*), melainkan melanjutkan putaran sirkuit baru (*circuit wrap-around*) mulai dari kotak 1. Contoh posisi 48, dadu 6 menghasilkan `[49,50,1,2,3,4]`; posisi 50, dadu 3 menghasilkan `[1,2,3]`.
 
 **Indisipliner:** jika landing setelah dadu berada pada kotak Indisipliner, server menambahkan `penalty_path` mundur satu per satu. Penalti hanya dievaluasi **sekali per roll**; kotak yang dilewati saat mundur tidak menyebabkan penalti berantai.
 
@@ -131,17 +131,14 @@ Urutan logis permainan selalu **1 sampai 50**, tidak ditentukan oleh DOM order. 
 Contoh posisi 14, dadu 3: `dice_path=[15,16,17]`, landing 17 dengan penalti −5, `penalty_path=[16,15,14,13,12]`, final **12**. Kotak 35 yang mundur ke kotak 30 tidak memicu penalti kedua.
 
 ```js
-/** Menolak input di luar aturan dadu fisik dan menghitung lintasan server-side, termasuk pantulan. */
+/** Menolak input di luar aturan dadu fisik dan menghitung lintasan server-side dengan sirkuit wrap-around. */
 function dicePath(from, dice, last = 50) {
   if (!Number.isInteger(from) || from < 0 || from > last) throw Error('invalid position');
   if (!Number.isInteger(dice) || dice < 1 || dice > 6) throw Error('invalid dice');
   let current = from;
-  let direction = +1;
   const path = [];
   for (let step = 0; step < dice; step++) {
-    if (current + direction > last) direction = -1;
-    if (current + direction < 1) direction = +1;
-    current += direction;
+    current = current === last ? 1 : current + 1;
     path.push(current);
   }
   return path;
@@ -212,7 +209,7 @@ Akun awal dibuat melalui CLI lokal `admin:bootstrap`; aplikasi tidak menyediakan
 ### 5.1 Alur operator
 
 1. Board 50 kotak langsung tersedia di `/`, termasuk sebelum game disiapkan. Super Admin login dan membuka
-   `/admin/games`, menginisialisasi satu game melalui **Atur tim**, lalu menyimpan 2–10 tim serta poin per kotak.
+   `/admin/games`, menginisialisasi satu game melalui **Atur tim**, lalu menyimpan 2–15 tim serta poin per kotak.
 2. **Mulai bermain** menjalankan preflight lalu Start dengan versi respons server. Browser mengambil lease
    controller yang kosong otomatis; pengambilalihan browser lain tetap memerlukan konfirmasi eksplisit.
 3. Active Controller memasukkan hasil dadu fisik (1–6). Backend mengunci giliran, menghitung `dice_path`, dan bila perlu `penalty_path`.
@@ -280,9 +277,9 @@ dan event `game:finished`. Reset pada halaman utama adalah tindakan berbeda dan 
 | ID | Domain | Requirement | Prioritas | Kriteria penerimaan |
 |---|---|---|---|---|
 | FR-01 | Auth | Login/logout/refresh, session dan RBAC Super Admin | P0 | Endpoint write tidak dapat dipakai tanpa auth yang sah |
-| FR-02 | Setup | Satu game; 2–10 tim, warna/urutan, poin challenge per kotak; Mulai bermain | P0 | Preflight/Start tetap divalidasi server; pengaturan terkunci setelah mulai; editor/impor board tersedia pada URL lama |
+| FR-02 | Setup | Satu game; 2–15 tim, warna/urutan, poin challenge per kotak; Mulai bermain | P0 | Preflight/Start tetap divalidasi server; pengaturan terkunci setelah mulai; editor/impor board tersedia pada URL lama |
 | FR-03 | Movement | Input dadu fisik 1–6; round-robin | P0 | Tidak ada random roll digital dan giliran tidak melompat |
-| FR-04 | Movement | Langkah 1–50, bounce, penalti Indisipliner | P0 | Path dihitung server; animasi kotak per kotak tanpa chain penalty |
+| FR-04 | Movement | Langkah 1–50, wrap-around sirkuit, penalti Indisipliner | P0 | Path dihitung server; animasi kotak per kotak tanpa chain penalty |
 | FR-05 | Scoring | BUTTON/SUCCESS atau FAIL untuk seluruh non-Indisipliner | P0 | Poin default / 0, persis satu hasil per turn |
 | FR-06 | Scoring | MANUAL integer non-negatif dan limit backend | P0 | Poin yang masuk persis input; tidak menjumlahkan poin otomatis |
 | FR-07 | Scoring | Aktivitas Action/Reward/Race Strength/Pit Stop eksternal | P0 | Tidak ada form jawaban/bukti, timer kegiatan, atau validasi narasi Reward |
@@ -293,10 +290,10 @@ dan event `game:finished`. Reset pada halaman utama adalah tindakan berbeda dan 
 | FR-12 | Consistency | Row locks, idempotency, immutable ledger, event outbox | P0 | Retry/concurrent request tidak menyebabkan efek ganda |
 | FR-13 | Sync | Socket.IO, snapshot, sequence recovery dan reconnect | P0 | Posisi/turn/score tetap benar setelah network interruption |
 | FR-14 | Display | Grid 5×10 zigzag warna kategori; tampilan 2.5D | P0 | Semua 50 kotak terlihat pada resolusi venue tanpa pemilih mode |
-| FR-15 | Display | Racing chip T1–T10, dark base, outline putih | P0 | Identitas dapat dibaca tanpa mengandalkan warna |
-| FR-16 | Display | Token clustering ≤3 chip + indikator `+N` | P0 | 1–10 tim/kotak tidak menutupi nomor/label; total akurat |
-| FR-17 | Display | Overlay token dan highlight lintasan di dalam board | P0 | Animasi langkah, bounce dan penalti tanpa teleport, crop atau perubahan geometri grid; tidak memakai HUD/breadcrumb eksternal |
-| FR-18 | Display | Leaderboard di samping board | P0 | Kode, nama, posisi dan poin seluruh 2–10 tim tersedia; pembagian lebar konten board 70–75%, leaderboard 25–30% |
+| FR-15 | Display | Racing chip T1–T15, dark base, outline putih | P0 | Identitas dapat dibaca tanpa mengandalkan warna |
+| FR-16 | Display | Token clustering ≤3 chip + indikator `+N` | P0 | 1–15 tim/kotak tidak menutupi nomor/label; total akurat |
+| FR-17 | Display | Overlay token dan highlight lintasan di dalam board | P0 | Animasi langkah, sirkuit wrap-around dan penalti tanpa teleport, crop atau perubahan geometri grid; tidak memakai HUD/breadcrumb eksternal |
+| FR-18 | Display | Leaderboard di samping board | P0 | Kode, nama, posisi dan poin seluruh 2–15 tim tersedia; pembagian lebar konten board 70–75%, leaderboard 25–30% |
 | FR-19 | Display | Komposisi publik minimal | P0 | Hanya judul, board dan leaderboard; tanpa HUD, tracker, occupancy panel, toolbar, legenda atau footer |
 | FR-20 | Operasional display | Fullscreen/kiosk melalui browser/OS; reduced motion mengikuti OS | P1 | Panduan operator terpisah dari board; tidak ada toolbar atau audio otomatis pada board |
 | FR-21 | Operasional | Corrections dengan alasan, history, audit dan ekspor CSV | P1 | Koreksi berupa ledger kompensasi dan dapat ditelusuri |
@@ -338,9 +335,9 @@ Board publik `/` memuat tepat tiga permukaan: judul game, boardgame dan leaderbo
 | 0 | Tidak ada chip | — |
 | 1 | 1 chip Tn | Leaderboard |
 | 2–3 | 2–3 chip Tn dengan jarak teratur | Leaderboard |
-| 4–10 | **Maksimal 3 chip Tn + `+N`**, dengan `N=total−3` | `N TIM` total + identitas seluruh tim di leaderboard |
+| 4–15 | **Maksimal 3 chip Tn + `+N`**, dengan `N=total−3` | `N TIM` total + identitas seluruh tim di leaderboard |
 
-- **`+N` adalah jumlah tim yang disembunyikan**, sedangkan `N TIM` adalah total penghuni. Contoh 10 tim → 3 chip + `+7` + label `10 TIM` (bukan 17 tim).
+- **`+N` adalah jumlah tim yang disembunyikan**, sedangkan `N TIM` adalah total penghuni. Contoh 10 tim → 3 chip + `+7` + label `10 TIM`, atau 15 tim → 3 chip + `+12` + label `15 TEAMS` (bukan 27 tim).
 - Tiga chip ditentukan stabil menurut `sort_order`, lalu `id`, dengan prioritas chip active team bila berada di kotak tersebut.
 - Nomor, kategori, dan nama kotak tidak boleh tertutup dock atau badge. Kategori selalu ditulis lengkap,
   termasuk di layar kecil, saat cluster dan saat gerakan. Jika sempit, tampilkan chip prioritas + total tim;
@@ -408,7 +405,7 @@ tetap digunakan pada URL kompatibilitas; mobile tidak boleh overflow halaman.
 | `BoardCell` | `cell` berisi occupancy/highlight, `activeTeamId` | Nomor/kategori lengkap terlihat; dock tidak overflow |
 | `RacingToken` / `RacingChip` | Tim dan status aktif | Chip Tn 2.5D; varian aktif lebih besar |
 | `TokenCluster` | `occupants`, `chips`, `hidden`, `count`, `activeTeamId`, `cellNumber` | Maks 3 chip dan `+N` sesuai occupancy |
-| `MovementOverlay` | `timeline`, `team`, `cells` | Satu langkah/kotak dengan bounce dan penalti |
+| `MovementOverlay` | `timeline`, `team`, `cells` | Satu langkah/kotak dengan wrap-around dan penalti |
 | `LeaderboardPanel` | `leaderboard`, `activeTeamId` | Ranking backend, kode/nama/posisi/poin |
 
 ## 8. Arsitektur dan struktur kode
@@ -604,7 +601,7 @@ di setiap request. Ekspor CSV tetap memakai content type CSV; envelope ini berla
 | `POST /api/v1/games/:id/duplicate` | API duplikasi kompatibilitas | konfigurasi saja ke DRAFT baru; tidak mengganti pointer publik |
 | `GET /api/v1/games/:id/snapshot` | Posisi, skor, turn, active movement, version | admin atau scoped display token |
 | `PUT /api/v1/games/:id/setup` | Upsert tim/config cells | hanya DRAFT/READY; optimistic concurrency |
-| `POST /api/v1/games/:id/validate` | Preflight 50 cells, 2–10 teams, kategori, poin/punishment, turn order | tidak meminta instruksi/aktivitas Reward; hanya data yang diperlukan engine/scoring menjadi blocking |
+| `POST /api/v1/games/:id/validate` | Preflight 50 cells, 2–15 teams, kategori, poin/punishment, turn order | tidak meminta instruksi/aktivitas Reward; hanya data yang diperlukan engine/scoring menjadi blocking |
 | `POST /api/v1/games/:id/start` | Start game | READY, valid configuration |
 | `POST /api/v1/games/:id/pause` | Pause | RUNNING, no active movement |
 | `POST /api/v1/games/:id/resume` | Resume | PAUSED |
@@ -824,9 +821,9 @@ Socket.IO melakukan reconnect, namun realtime message **bukan transactional even
 
 | ID | Scenario | Expected result |
 |---|---|---|
-| AT-01 | Setup hanya 1 atau 11 tim | Ditolak; 2–10 wajib |
+| AT-01 | Setup hanya 1 atau 16 tim | Ditolak; 2–15 wajib |
 | AT-02 | Duplicate nomor cell / hanya 49 cell | Preflight gagal; start disabled |
-| AT-03 | 10 tim mulai dari START (posisi 0) | Semua token tampil, giliran tim pertama |
+| AT-03 | Hingga 15 tim mulai dari START (posisi 0) | Semua token tampil, giliran tim pertama |
 | AT-04 | Dari posisi 0 roll 3 | Path `[1,2,3]`, animasi step-by-step |
 | AT-05 | Dari posisi 48 roll 4 | Path `[49,50,49,48]`, final 48 |
 | AT-06 | Dari posisi 50 roll 3 | Path `[49,48,47]`, final 47 |
@@ -909,7 +906,7 @@ Socket.IO melakukan reconnect, namun realtime message **bukan transactional even
 | Fase | Fokus | Hasil yang wajib tersedia |
 |---|---|---|
 | **1. Foundation** | Monorepo, autentikasi, migrations, seed 50 kotak, setup game/tim, basic board dan display | Data model dan preflight valid; board 50 kotak tampil |
-| **2. Engine dan movement** | Round-robin, dadu fisik, bounce, punishment, transaksi roll, timeline animasi dan highlight lintasan dalam board | Pergerakan deterministik tanpa teleport dan tanpa double-roll |
+| **2. Engine dan movement** | Round-robin, dadu fisik, sirkuit wrap-around, punishment, transaksi roll, timeline animasi dan highlight lintasan dalam board | Pergerakan deterministik tanpa teleport dan tanpa double-roll |
 | **3. Scoring dan operasi** | BUTTON/MANUAL, ledger, leaderboard, Active Controller, histori, audit, pause/finish, ekspor | Tepat satu hasil poin/turn; Reward/challenge tetap offline |
 | **4. Stabilitas dan venue QA** | Idempotency, row lock, outbox, reconnect, koreksi, keamanan, uji 10 tim, uji LED | Acceptance test dan rehearsal end-to-end lulus |
 

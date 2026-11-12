@@ -66,18 +66,29 @@ export async function rollDice({
         throw new GameError('STALE_STATE', 'State game telah berubah. Muat ulang sebelum melakukan roll.', 409);
       }
 
-      if (game.activeTurnId !== null) {
-        throw new GameError('TURN_NOT_READY', 'Giliran sedang berlangsung atau menunggu hasil.', 409);
+      const targetTeamId = input.teamId || game.currentTeamId;
+      const team = await Team.findByPk(targetTeamId, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!team || team.gameId !== game.id) {
+        throw new GameError('TEAM_NOT_FOUND', 'Tim tidak ditemukan.', 404);
+      }
+
+      // Rule 1A: 1 Pending Challenge per team
+      const pendingTeamTurn = await Turn.findOne({
+        where: {
+          gameId: game.id,
+          teamId: team.id,
+          status: { [Op.in]: ['ANIMATING', 'AWAITING_RESULT', 'RESOLVING_PENALTY'] }
+        },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+      if (pendingTeamTurn) {
+        throw new GameError('TURN_NOT_READY', `Tim ${team.name} masih memiliki giliran atau tantangan yang belum selesai.`, 409);
       }
 
       const nextTurnNumber = safeInteger(game.turnNumber) + 1;
       if (input.expectedTurnNumber !== undefined && input.expectedTurnNumber !== nextTurnNumber) {
         throw new GameError('STALE_STATE', 'Nomor turn tidak sesuai. Muat ulang status game.', 409);
-      }
-
-      const team = await Team.findByPk(game.currentTeamId, { transaction, lock: transaction.LOCK.UPDATE });
-      if (!team) {
-        throw new GameError('TEAM_NOT_FOUND', 'Tim aktif tidak ditemukan.', 404);
       }
 
       const cells = await BoardCell.findAll({
@@ -100,7 +111,22 @@ export async function rollDice({
       });
 
       const now = await databaseNow(sequelize, transaction);
-      const movementStartsAt = new Date(now.getTime() + START_DELAY_MS);
+      const latestAnimatingTurn = await Turn.findOne({
+        where: {
+          gameId: game.id,
+          status: 'ANIMATING',
+          movementEndsAt: { [Op.gt]: now }
+        },
+        order: [['movementEndsAt', 'DESC']],
+        transaction
+      });
+
+      const baseStartMs = now.getTime() + START_DELAY_MS;
+      const queuedStartMs = latestAnimatingTurn
+        ? Math.max(baseStartMs, new Date(latestAnimatingTurn.movementEndsAt).getTime() + 300)
+        : baseStartMs;
+
+      const movementStartsAt = new Date(queuedStartMs);
       const movementEndsAt = new Date(movementStartsAt.getTime() + movement.fullPath.length * STEP_DURATION_MS);
 
       const turn = await Turn.create({
@@ -327,7 +353,7 @@ export async function recordChallengeResult({
         throw new GameError('TURN_NOT_READY', 'Gerakan bidak sedang berlangsung.', 409);
       }
 
-      if (turn.status !== 'AWAITING_RESULT' || game.activeTurnId !== turn.id) {
+      if (turn.status !== 'AWAITING_RESULT') {
         throw new GameError('TURN_NOT_READY', 'Giliran tidak sedang menunggu hasil.', 409);
       }
 
@@ -410,7 +436,18 @@ export async function recordChallengeResult({
       const currentIndex = allTeams.findIndex((t) => t.id === team.id);
       const nextTeam = allTeams[(currentIndex + 1) % allTeams.length];
 
-      game.activeTurnId = null;
+      if (game.activeTurnId === turn.id) {
+        const anotherActiveTurn = await Turn.findOne({
+          where: {
+            gameId: game.id,
+            id: { [Op.ne]: turn.id },
+            status: { [Op.in]: ['ANIMATING', 'AWAITING_RESULT'] }
+          },
+          order: [['turnNumber', 'DESC']],
+          transaction
+        });
+        game.activeTurnId = anotherActiveTurn ? anotherActiveTurn.id : null;
+      }
       game.currentTeamId = nextTeam ? nextTeam.id : team.id;
       game.stateVersion = safeInteger(safeInteger(game.stateVersion) + 1);
       game.eventSequence = safeInteger(safeInteger(game.eventSequence) + 1);
@@ -486,9 +523,9 @@ export async function recordChallengeResult({
         payloadJson: {
           status: game.status,
           currentTeamId: game.currentTeamId,
-          activeTurnId: null,
+          activeTurnId: game.activeTurnId,
           turnNumber: safeInteger(game.turnNumber),
-          turnStatus: 'READY_FOR_ROLL'
+          turnStatus: game.activeTurnId ? 'AWAITING_RESULT' : 'READY_FOR_ROLL'
         },
         actorType: 'USER',
         actorUserId,
@@ -534,6 +571,7 @@ export async function recordChallengeResult({
           success: true,
           data: {
             turnId: turn.id,
+            teamId: team.id,
             scoringMethod: input.scoringMethod,
             outcome,
             awardedPoints,
@@ -835,9 +873,9 @@ export async function voidTurn({
         payloadJson: {
           status: game.status,
           currentTeamId: game.currentTeamId,
-          activeTurnId: null,
+          activeTurnId: game.activeTurnId,
           turnNumber: safeInteger(game.turnNumber),
-          turnStatus: 'READY_FOR_ROLL'
+          turnStatus: game.activeTurnId ? 'AWAITING_RESULT' : 'READY_FOR_ROLL'
         },
         actorType: 'USER',
         actorUserId,

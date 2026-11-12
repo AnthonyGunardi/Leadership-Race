@@ -12,6 +12,20 @@ export function SimpleGameWorkspace({ session, snapshot, install, reload, saved,
   const [showVoidConfirm, setShowVoidConfirm] = useState(false);
   const [voidReason, setVoidReason] = useState('');
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
+  const [selectedTeamId, setSelectedTeamId] = useState(null);
+  const [activeChallengeTurnId, setActiveChallengeTurnId] = useState(null);
+
+  const teams = view.query.data?.data?.teams ?? snapshot.data?.teams ?? [];
+  const activeDiceTeam = teams.find((t) => t.id === selectedTeamId) || view.currentTeam || teams[0];
+  const pendingResults = view.pendingResults?.length > 0
+    ? view.pendingResults
+    : (view.pendingResult ? [view.pendingResult] : []);
+  const pendingTeamIds = new Set(pendingResults.map((p) => p.teamId));
+  const activeChallenge = pendingResults.find((p) => p.turnId === activeChallengeTurnId) || pendingResults[0] || null;
+
+  const canRollSelectedTeam = activeDiceTeam
+    ? (view.canRollTeam ? view.canRollTeam(activeDiceTeam.id) : view.canRoll)
+    : view.canRoll;
 
   const canFinish = ['RUNNING', 'PAUSED'].includes(view.status) && view.turnStatus === 'READY_FOR_ROLL' && !view.disabled;
 
@@ -36,12 +50,29 @@ export function SimpleGameWorkspace({ session, snapshot, install, reload, saved,
       <section id="admin-position" className="simple-section simple-play" aria-labelledby="simple-position-title">
         <h2 id="simple-position-title">Pawn positions</h2>
         <ul className="simple-positions" aria-label="Team positions">
-          {view.query.data?.data?.teams?.map((team) => <li key={team.id}
-            aria-current={team.id === view.currentTeam?.id ? 'true' : undefined}>
-            <span><strong>{team.code} · {team.name}</strong>
-              {team.id === view.currentTeam?.id && <small>Active turn</small>}</span>
-            <span>{team.position === 0 ? 'START' : `Cell ${team.position}`}<small>{team.totalScore} pts</small></span>
-          </li>)}
+          {teams.map((team) => {
+            const isSelected = team.id === activeDiceTeam?.id;
+            const isPendingScore = pendingTeamIds.has(team.id);
+            return (
+              <li
+                key={team.id}
+                aria-current={isSelected ? 'true' : undefined}
+                className={isSelected ? 'selected-team-row' : ''}
+                style={{ cursor: view.status === 'RUNNING' ? 'pointer' : 'default' }}
+                onClick={() => view.status === 'RUNNING' && setSelectedTeamId(team.id)}
+              >
+                <span>
+                  <strong>{team.code} · {team.name}</strong>
+                  {isSelected && <small> (Selected for roll)</small>}
+                  {isPendingScore && <small style={{ color: '#f59e0b', marginLeft: '6px' }}>[Waiting score]</small>}
+                </span>
+                <span>
+                  {team.position === 0 ? 'START' : `Cell ${team.position}`}
+                  <small>{team.totalScore} pts</small>
+                </span>
+              </li>
+            );
+          })}
         </ul>
 
         {view.lastTurn?.status === 'VOIDED' && view.turnStatus === 'READY_FOR_ROLL' && (
@@ -60,10 +91,44 @@ export function SimpleGameWorkspace({ session, snapshot, install, reload, saved,
           </button>
         </>}
         {view.status === 'RUNNING' && <>
-          <p id="simple-dice-label">Enter physical dice for <strong>{view.currentTeam?.name}</strong>.</p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+            <p id="simple-dice-label" style={{ margin: 0 }}>
+              Enter physical dice for <strong>{activeDiceTeam?.name}</strong>.
+            </p>
+            {teams.length > 1 && (
+              <select
+                aria-label="Select team to roll"
+                value={activeDiceTeam?.id || ''}
+                onChange={(e) => setSelectedTeamId(e.target.value)}
+                disabled={controls.blocked}
+                style={{ padding: '4px 8px', borderRadius: '4px' }}
+              >
+                {teams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.code} - {t.name} {pendingTeamIds.has(t.id) ? '(Challenge pending)' : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+          {pendingTeamIds.has(activeDiceTeam?.id) && (
+            <p role="status" style={{ color: '#d97706', fontSize: '0.9em', margin: '4px 0 8px 0' }}>
+              Tim {activeDiceTeam?.name} sedang menunggu penilaian tantangan.{' '}
+              Nilai tantangan di bawah sebelum melempar dadu lagi.
+            </p>
+          )}
           <div className="simple-dice" role="group" aria-labelledby="simple-dice-label">
-            {[1, 2, 3, 4, 5, 6].map((number) => <button type="button" key={number} aria-label={`Dice ${number}`}
-              disabled={!view.canRoll || controls.blocked} onClick={() => view.roll(number)}>{number}</button>)}
+            {[1, 2, 3, 4, 5, 6].map((number) => (
+              <button
+                type="button"
+                key={number}
+                aria-label={`Dice ${number}`}
+                disabled={!canRollSelectedTeam || controls.blocked}
+                onClick={() => view.roll(number, activeDiceTeam?.id)}
+              >
+                {number}
+              </button>
+            ))}
           </div>
           {view.active && !view.ownsLease && <>
             <p role="status">Dice input is in use by another browser.</p>
@@ -74,9 +139,43 @@ export function SimpleGameWorkspace({ session, snapshot, install, reload, saved,
             onClick={view.acquire}>Enable dice input</button>}
         </>}
         {view.turnStatus === 'ANIMATING' && <p role="status">Token is moving. Please wait until finished.</p>}
-        {view.turnStatus === 'AWAITING_RESULT' && <ChallengeScoringForm pendingResult={view.pendingResult}
-          disabled={!view.canSubmitResult || controls.blocked} submitting={view.command.pending}
-          onSubmit={view.submitResult} />}
+        {pendingResults.length > 0 && (
+          <div className="pending-challenges-container" style={{ marginTop: '16px' }}>
+            {pendingResults.length > 1 && (
+              <div style={{ marginBottom: '8px' }}>
+                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>
+                  Tantangan Tertunda ({pendingResults.length} tim):
+                </label>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {pendingResults.map((p) => {
+                    const pTeam = teams.find((t) => t.id === p.teamId);
+                    const isSelectedChallenge = (activeChallenge?.turnId === p.turnId);
+                    return (
+                      <button
+                        key={p.turnId}
+                        type="button"
+                        className={isSelectedChallenge ? 'mode-tab active' : 'mode-tab'}
+                        style={{ padding: '4px 10px', fontSize: '0.85em' }}
+                        onClick={() => setActiveChallengeTurnId(p.turnId)}
+                      >
+                        {pTeam?.name || 'Team'} (Cell {p.cellNumber})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {activeChallenge && (
+              <ChallengeScoringForm
+                key={activeChallenge.turnId}
+                pendingResult={activeChallenge}
+                disabled={!view.canSubmitResult || controls.blocked}
+                submitting={view.command.pending}
+                onSubmit={(payload) => view.submitResult({ ...payload, turnId: activeChallenge?.turnId })}
+              />
+            )}
+          </div>
+        )}
 
         {view.canVoid && !showVoidConfirm && (
           <div className="simple-void-trigger">

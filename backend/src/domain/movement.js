@@ -11,17 +11,16 @@ const movementSchema = z.object({
 });
 
 /**
- * Server-only, pure calculation: passing cells have no effect, bounce applies at 50, and penalties apply once.
- * Configured penalties stop at START (0); they never create negative positions or trigger another landing effect.
+ * Server-only, pure calculation: passing cells have no effect, movement past 50 wraps around to 1 (circuit lap),
+ * and penalties apply once. Configured penalties stop at START (0); they never create negative positions
+ * or trigger another landing effect.
  */
 export function calculateMovement(input) {
   const { from, diceValue, boardCells } = movementSchema.parse(input);
   let position = from;
-  let direction = from === 50 ? -1 : 1;
   const dicePath = [];
   for (let step = 0; step < diceValue; step += 1) {
-    if (position === 50) direction = -1;
-    position += direction;
+    position = position === 50 ? 1 : position + 1;
     dicePath.push(position);
   }
   const landingCell = position;

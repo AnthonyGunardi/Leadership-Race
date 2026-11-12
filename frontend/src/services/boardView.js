@@ -43,7 +43,7 @@ export function buildBoardView(snapshot, timeline = null) {
     const cell = configured.get(number);
     const isInPath = fullPathSet.has(number);
     const isCurrentStep = Boolean(timeline?.isMoving && timeline?.currentCell === number);
-    const isBouncePoint = Boolean(timeline?.isBounce && number === 50);
+    const isBouncePoint = false;
     const isPenaltyStep = penaltyPathSet.has(number);
     const isLandingCell = Boolean(timeline?.isMoving && timeline?.movement?.landingCell === number);
 

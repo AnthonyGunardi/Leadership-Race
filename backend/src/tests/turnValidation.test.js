@@ -46,6 +46,38 @@ describe('validateTurnRequest middleware', () => {
     expect(req.gameInput.input.expectedTurnNumber).toBeUndefined();
   });
 
+  it('accepts valid roll request with specific teamId UUID', () => {
+    const teamId = randomUUID();
+    const req = createRequest({
+      teamId,
+      diceValue: 3,
+      expectedStateVersion: 2,
+      controllerLeaseToken: validToken
+    });
+    const next = vi.fn();
+    rollMiddleware(req, {}, next);
+
+    expect(next).toHaveBeenCalledWith();
+    expect(req.gameInput.input.teamId).toBe(teamId);
+    expect(req.gameInput.input.diceValue).toBe(3);
+  });
+
+  it('rejects roll request with invalid teamId format', () => {
+    const req = createRequest({
+      teamId: 'invalid-not-a-uuid',
+      diceValue: 3,
+      expectedStateVersion: 2,
+      controllerLeaseToken: validToken
+    });
+    const next = vi.fn();
+    rollMiddleware(req, {}, next);
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      status: 400,
+      code: 'VALIDATION_ERROR'
+    }));
+  });
+
   it('rejects diceValue below 1 or above 6', () => {
     for (const invalidDice of [0, 7, -1, 3.5, '3', null]) {
       const req = createRequest({

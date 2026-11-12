@@ -16,12 +16,20 @@ it('accepts the minimum two teams and Reward references that are empty or narrat
   expect(assertGamePreflight(input)).toMatchObject({ valid: true, teamCount: 2, cellCount: 50 });
 });
 
+it('accepts the maximum fifteen teams at preflight', () => {
+  const input = configuration();
+  input.teams = Array.from({ length: 15 }, (_, index) => ({
+    name: `Tim ${index + 1}`, sortOrder: index + 1, color: '#1254a3', position: 0, totalScore: 0
+  }));
+  expect(assertGamePreflight(input)).toMatchObject({ valid: true, teamCount: 15, cellCount: 50 });
+});
+
 it.each([
   ['49 cells', (input) => input.boardCells.pop()],
   ['duplicate cell number', (input) => { input.boardCells[0].number = 2; }],
   ['one team', (input) => input.teams.pop()],
-  ['eleven teams', (input) => {
-    input.teams = Array.from({ length: 11 }, (_, index) => ({
+  ['sixteen teams', (input) => {
+    input.teams = Array.from({ length: 16 }, (_, index) => ({
       name: `Tim ${index}`, sortOrder: index + 1, color: '#1254a3', position: 0, totalScore: 0
     }));
   }],

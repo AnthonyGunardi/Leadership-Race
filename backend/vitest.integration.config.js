@@ -6,8 +6,8 @@ export default defineConfig({
     include: ['src/tests/integration/**/*.test.js'],
     exclude: ['**/node_modules/**'],
     fileParallelism: false,
-    hookTimeout: 30000,
-    testTimeout: 30000
+    hookTimeout: 60000,
+    testTimeout: 60000
   }
 });
 

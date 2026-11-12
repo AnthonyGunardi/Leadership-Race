@@ -47,7 +47,7 @@ API/URL kompatibilitas yang masih terdaftar tetap dilindungi dan tidak menjadi a
 ## 2. Objective, pengguna, dan ruang lingkup
 
 Membangun aplikasi web online untuk panitia PT Prakarsa Alam Segar menjalankan F1 Leadership Race pada event
-tatap muka. Aplikasi mengelola 2–10 tim, board 50 kotak, giliran, perpindahan, penalti, poin, dan tampilan publik.
+tatap muka. Aplikasi mengelola 2–15 tim, board 50 kotak, giliran, perpindahan, penalti, poin, dan tampilan publik.
 Keberhasilan ditentukan oleh konsistensi transaksi dan keterbacaan operasional, bukan banyaknya efek visual.
 
 | Pengguna | Kebutuhan | Batas akses |
@@ -62,7 +62,7 @@ Keberhasilan ditentukan oleh konsistensi transaksi dan keterbacaan operasional, 
 - Login/logout/refresh, session, beberapa akun dengan role `SUPER_ADMIN`.
 - Satu game operasional; admin satu halaman untuk tim, posisi/dadu, poin per kotak dan reset.
   Mulai bermain merangkum preflight/Start; editor board lengkap dan lifecycle tetap tersedia pada URL lama.
-- Input angka dadu fisik 1–6; round-robin; bounce di 50; penalti Indisipliner otomatis.
+- Input angka dadu fisik 1–6; round-robin; sirkuit wrap-around di 50; penalti Indisipliner otomatis.
 - Hasil poin BUTTON atau MANUAL, ledger, leaderboard, koreksi dengan audit, dan final result manual.
 - Display minimal: judul game, board 2.5D 70–75% dan leaderboard samping 25–30%; chip/clustering/animasi tetap di dalam board.
 - Active Controller, idempotency, transaksi, outbox, snapshot, reconnect, histori, dan ekspor CSV.
@@ -89,8 +89,8 @@ Satu `SPEC.md` dipertahankan; status pekerjaan dan bukti ada pada task list.
 | ID stabil | Tanggung jawab dan requirement | Bergantung pada |
 |---|---|---|
 | `identity-access` | Auth/session, role, akses per game/arsip, scope baca publik; FR-01, FR-22 | — |
-| `game-setup` | Game, 2–10 tim, 50 kotak, urutan, preflight; FR-02 | `identity-access` |
-| `turn-movement` | Lease/takeover, dadu, round-robin, bounce, penalti, void terakhir; FR-03, FR-04, FR-11 dan Bagian 4.6 | `game-setup` |
+| `game-setup` | Game, 2–15 tim, 50 kotak, urutan, preflight; FR-02 | `identity-access` |
+| `turn-movement` | Lease/takeover, dadu, round-robin, sirkuit wrap-around, penalti, void terakhir; FR-03, FR-04, FR-11 dan Bagian 4.6 | `game-setup` |
 | `scoring-results` | BUTTON/MANUAL, Origami, leaderboard, lifecycle, final, koreksi/ekspor; FR-05–FR-10, FR-21 | `turn-movement` |
 | `realtime-recovery` | Kontrak end-to-end outbox, event sequence, snapshot, reconnect; FR-12, FR-13 | `scoring-results` |
 | `race-display` | Board minimal, token, highlight lintasan, leaderboard, venue QA; FR-14–FR-20, FR-23 | `realtime-recovery` |
@@ -185,7 +185,7 @@ Void: AWAITING_RESULT/COMPLETED → VOIDED → READY_FOR_ROLL (tim yang sama; ro
 
 | Operasi/state | Syarat dan efek |
 |---|---|
-| Preflight/READY | 50 kotak, 2–10 tim, kategori, nilai engine/scoring, dan turn order valid |
+| Preflight/READY | 50 kotak, 2–15 tim, kategori, nilai engine/scoring, dan turn order valid |
 | Start | Hanya dari READY dengan konfigurasi valid |
 | Roll | RUNNING, READY_FOR_ROLL, lease valid, expected turn/version sesuai |
 | ANIMATING | Path sudah disimpan; roll berikutnya ditolak `409 TURN_NOT_READY` |
@@ -683,7 +683,7 @@ sesudah handshake sesuai [Socket.IO middlewares](https://socket.io/docs/v4/middl
 | `/display/:id/*` | Redirect ke `/`, tanpa pairing |
 
 Halaman utama tidak memuat sidebar, katalog/arsip, pairing, controller teknis, editor 50 kotak atau menu
-pause/finish/histori. Tim 2–10 dapat diatur nama/warna/urutan; posisi hanya melalui dadu fisik 1–6, tanpa
+pause/finish/histori. Tim 2–15 dapat diatur nama/warna/urutan; posisi hanya melalui dadu fisik 1–6, tanpa
 pemindahan bebas. Poin Sukses/default BUTTON atau MANUAL berbeda per kotak; Gagal 0, manual 0–200.
 Pengaturan tersimpan hanya sebelum mulai, terkunci dan dapat dilipat setelah mulai. Draft tidak ditimpa
 polling; konflik meminta muat ulang eksplisit; field invalid membuka kelompok terlipat sebelum fokus.
@@ -727,10 +727,10 @@ Backend boleh menyimpan posisi final segera, tetapi rendering menggunakan `visua
 Selama STARTING sebelum `startAt`, pion tetap di `from`. Dadu 3 dari kotak 2 harus terlihat 2 → 3 → 4 → 5,
 tanpa lebih dahulu muncul di kotak 5. Scheduler tidak boleh mereset timeline akibat render pembaruan waktunya sendiri.
 Satu tim direpresentasikan chip statis atau overlay aktif pada satu waktu. Saat bergerak keluar, occupancy asal
-berkurang pada awal motion; tujuan bertambah setelah landing. Token bergerak per kotak, termasuk bounce/penalti,
+berkurang pada awal motion; tujuan bertambah setelah landing. Token bergerak per kotak, termasuk wrap-around/penalti,
 tanpa teleport atau double marker; total identitas tim termasuk START tetap sama dengan jumlah tim.
 
-Token aktif dan highlight di dalam board menunjukkan lintasan normal, bounce dan penalti tanpa menutupi nomor/kategori.
+Token aktif dan highlight di dalam board menunjukkan lintasan normal, sirkuit wrap-around dan penalti tanpa menutupi nomor/kategori.
 Informasi dadu dan status rinci giliran tetap berada pada kontrol admin.
 Reconnect melanjutkan progress berdasarkan snapshot active movement dan waktu server; jika selesai, tampilkan final.
 
@@ -833,7 +833,7 @@ Runner/config sudah tersedia. Hasil run dan keterbatasannya mengikuti baseline p
 
 | Level | Perilaku yang harus dibuktikan |
 |---|---|
-| Unit/domain | Dice input, bounce, penalti tunggal, round-robin, mode scoring, nilai 0/batas, ranking/invariant |
+| Unit/domain | Dice input, wrap-around sirkuit, penalti tunggal, round-robin, mode scoring, nilai 0/batas, ranking/invariant |
 | Integration + MySQL terisolasi | Commit/rollback, lock/concurrency, unique constraints, idempotent replay, ledger/score, outbox |
 | API/auth contract | Envelope/meta/header, centralized errors, state/version, role/lease/scope, invalid mode/input |
 | Realtime recovery | Join authorization, subscribe/snapshot race, gap/duplicate/out-of-order, crash/restart, token expiry |
@@ -861,7 +861,7 @@ bukan klaim semua skenario telah lulus. Hasil aktual serta gate tertunda mengiku
 | Acceptance PRD | Kriteria sukses ringkas | Kapabilitas |
 |---|---|---|
 | AT-01–AT-03 | 1/11 tim ditolak; board tidak lengkap/duplikat gagal; 10 tim mulai START dengan urutan benar | `game-setup`, `race-display` |
-| AT-04–AT-08 | Path normal/bounce/penalti persis Bagian 4.2; tidak ada chain penalty | `turn-movement` |
+| AT-04–AT-08 | Path normal/wrap-around sirkuit/penalti persis Bagian 4.2; tidak ada chain penalty | `turn-movement` |
 | AT-09–AT-10 | BUTTON SUCCESS sesuai server; FAIL 0 tetap satu hasil | `scoring-results` |
 | AT-11–AT-13 | Concurrent roll/hasil dan retry key sama hanya satu efek bisnis | `turn-movement`, `scoring-results` |
 | AT-14–AT-16 | Reconnect/dedup/gap pulih; roll saat animasi ditolak | `realtime-recovery`, `turn-movement` |
@@ -871,7 +871,7 @@ bukan klaim semua skenario telah lulus. Hasil aktual serta gate tertunda mengiku
 | AT-27–AT-32 | Invalid manual/mode ditolak; konflik mode satu hasil; 0 tersimpan tanpa ledger; retry/koreksi diaudit | `scoring-results` |
 | AT-33–AT-41 | Cluster 1–10 tim, occupancy saat motion/reconnect, komposisi minimal, reduced motion akurat dan terbaca | `race-display`, `realtime-recovery` |
 | AT-42–AT-44 | Chip terbaca di seluruh kategori; 4/6/10 tim → +1/+3/+7; active team terlihat tanpa double-count | `race-display` |
-| AT-45–AT-48 | Token/path normal/bounce/mundur jelas di dalam board; highlight tidak mengubah skala/urutan grid | `race-display` |
+| AT-45–AT-48 | Token/path normal/wrap-around sirkuit/mundur jelas di dalam board; highlight tidak mengubah skala/urutan grid | `race-display` |
 | AT-49–AT-54 | LED/venue/grayscale/nama panjang terbaca; reduced motion OS dan reconnect mempertahankan state | `race-display`, `realtime-recovery` |
 | AT-62–AT-68 | Root tanpa pairing, DTO publik aman, admin satu halaman, reset atomik/idempotent, arsip immutable, pindah sesi otomatis dan STARTING tanpa teleport | `identity-access`, `game-setup`, `race-display`, `realtime-recovery` |
 | AT-69 | Kategori lengkap tetap terlihat pada enam viewport/cluster/gerakan; mobile menambah tinggi tanpa overlap | `race-display` |

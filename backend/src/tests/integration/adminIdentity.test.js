@@ -161,6 +161,7 @@ describe('Admin identity migrations on isolated MySQL', () => {
 
   it('can remove and re-apply the migration only inside its owned isolated schema', async () => {
     const migrations = [
+      require('../../../migrations/202611110001-createSingleGame.cjs'),
       require('../../../migrations/202611100010-createFinalResults.cjs'),
       require('../../../migrations/202611100009-createChallengeResultsAndScoreLedger.cjs'),
       require('../../../migrations/202611100008-addGameActiveTurnConstraint.cjs'),
