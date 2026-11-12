@@ -14,8 +14,11 @@ const initialBoard = { data: { game: { id: null, name: 'F1 Leadership Race', sta
  */
 export function useDisplayBoard() {
   const current = useQuery({
-    queryKey: ['public-game'], queryFn: ({ signal }) => publicGameRequest({ path: '/game', signal }),
-    refetchInterval: 2000, retry: false
+    queryKey: ['public-game'],
+    queryFn: ({ signal }) => publicGameRequest({ path: '/game', signal }),
+    retry: (failureCount, error) => error?.status !== 401 && error?.status !== 403 && failureCount < 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
+    refetchInterval: 2000
   });
   const subscribedGameId = current.data?.data?.game?.id;
   const [state, setState] = useState({ snapshot: null, status: 'connecting', error: null });

@@ -9,6 +9,8 @@
  * - Zero plaintext secrets or credentials are placed in messages, storage, or query parameters.
  */
 
+import { API_BASE_URL } from '../config/api.js';
+
 let inFlightRefresh = null;
 const BROADCAST_CHANNEL_NAME = 'lr_admin_auth';
 const REFRESH_LOCK_NAME = 'lr_admin_refresh_lock';
@@ -128,7 +130,7 @@ export function subscribeAuthEvents(callback) {
  */
 export async function login({ email, password, signal } = {}) {
   try {
-    const res = await fetch('/api/v1/auth/login', {
+    const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -174,7 +176,7 @@ export async function login({ email, password, signal } = {}) {
  */
 async function performRefreshRequest(signal) {
   try {
-    const res = await fetch('/api/v1/auth/refresh', {
+    const res = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -280,7 +282,7 @@ export async function logout({ accessToken, signal } = {}) {
       headers.Authorization = `Bearer ${accessToken}`;
     }
 
-    const res = await fetch('/api/v1/auth/logout', {
+    const res = await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
       method: 'POST',
       headers,
       credentials: 'include',
@@ -323,7 +325,7 @@ export async function fetchAdminMe({ accessToken, signal } = {}) {
   }
 
   try {
-    const res = await fetch('/api/v1/auth/me', {
+    const res = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`,

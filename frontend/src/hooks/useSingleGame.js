@@ -7,8 +7,13 @@ import { useGameCommand, useGameConnectivity } from './useGames.js';
 export function useSingleGame(session) {
   const queryClient = useQueryClient();
   const online = useGameConnectivity();
-  const query = useQuery({ queryKey: ['public-game'],
-    queryFn: ({ signal }) => publicGameRequest({ path: '/game', signal }), refetchInterval: 2000, retry: false });
+  const query = useQuery({
+    queryKey: ['public-game'],
+    queryFn: ({ signal }) => publicGameRequest({ path: '/game', signal }),
+    retry: (failureCount, error) => error?.status !== 401 && error?.status !== 403 && failureCount < 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
+    refetchInterval: 2000
+  });
   const onSuccess = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['public-game'] });
     queryClient.invalidateQueries({ queryKey: ['game-archives'] });

@@ -14,19 +14,25 @@ export default defineConfig(({ mode }) => {
         '/socket.io': {
           target: backendTarget,
           ws: true,
-          changeOrigin: true
+          changeOrigin: true,
+          secure: false
         },
         '/api': {
           target: backendTarget,
-          changeOrigin: true
+          changeOrigin: true,
+          secure: false
         },
         '/health': {
           target: backendTarget,
-          changeOrigin: true
+          changeOrigin: true,
+          secure: false
+        },
+        '/leadership-race': {
+          target: backendTarget,
+          changeOrigin: true,
+          secure: false
         }
       }
     }
   };
 });
-
-

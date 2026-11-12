@@ -14,7 +14,9 @@ export function useControllerLease(session, gameId, { autoAcquire = false } = {}
   const [monotonicNow, setMonotonicNow] = useState(() => globalThis.performance.now());
   const online = useGameConnectivity();
   const query = useQuery({
-    queryKey: ['controller', session.user.id, gameId], retry: false,
+    queryKey: ['controller', session.user.id, gameId],
+    retry: (failureCount, error) => error?.status !== 401 && error?.status !== 403 && failureCount < 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
     refetchInterval: (currentQuery) => (currentQuery.state.data?.data?.turnStatus === 'ANIMATING' ? 1000 : 5000),
     refetchIntervalInBackground: true, refetchOnWindowFocus: true,
     queryFn: async ({ signal }) => ({

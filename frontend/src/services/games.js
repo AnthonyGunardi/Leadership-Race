@@ -1,6 +1,8 @@
+import { API_BASE_URL } from '../config/api.js';
+
 /** Game transport carries credentials only in headers and preserves command keys across uncertain retries. */
 export async function gameRequest({ accessToken, path = '', method = 'GET', body, key, signal,
-  basePath = '/api/v1/games' }) {
+  basePath = `${API_BASE_URL}/api/v1/games` }) {
   let response;
   try {
     response = await fetch(`${basePath}${path}`, {
@@ -10,7 +12,7 @@ export async function gameRequest({ accessToken, path = '', method = 'GET', body
       ...(body ? { body: JSON.stringify(body) } : {})
     });
   } catch (cause) {
-    if (cause.name === 'AbortError') throw cause;
+    if (cause.name === 'AbortError' || signal?.aborted) throw cause;
     throw Object.assign(new Error('Unable to connect. Retry the same action after connection is restored.'), {
       code: 'DISCONNECTED', unknownOutcome: method !== 'GET'
     });
@@ -35,7 +37,7 @@ export async function gameRequest({ accessToken, path = '', method = 'GET', body
 
 /** Public reads use a separate endpoint family and never require a pairing credential. */
 export function publicGameRequest(request) {
-  return gameRequest({ ...request, basePath: '/api/v1/public' });
+  return gameRequest({ ...request, basePath: `${API_BASE_URL}/api/v1/public` });
 }
 
 /**
@@ -54,7 +56,7 @@ export async function downloadGameCsv({ accessToken, gameId, scope = 'all', team
   if (teamId) params.set('teamId', teamId);
   const query = params.toString() ? `?${params.toString()}` : '';
 
-  const res = await fetch(`/api/v1/games/${gameId}/export.csv${query}`, {
+  const res = await fetch(`${API_BASE_URL}/api/v1/games/${gameId}/export.csv${query}`, {
     method: 'GET',
     credentials: 'include',
     headers: {

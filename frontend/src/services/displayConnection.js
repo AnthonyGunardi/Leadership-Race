@@ -1,5 +1,6 @@
 import { io } from 'socket.io-client';
 import { publicGameRequest } from './games.js';
+import { SOCKET_URL, SOCKET_NAMESPACE, SOCKET_PATH } from '../config/api.js';
 
 const integer = (value) => Number.isSafeInteger(value) && value >= 0;
 const uuid = /^[a-f0-9-]{36}$/;
@@ -16,11 +17,18 @@ function validEvent(event, gameId) {
  * G4 state_changed does not contain full setup, so new events require a snapshot covering their boundary.
  * https://socket.io/docs/v4/delivery-guarantees/
  */
-export function createDisplayConnection({ gameId, onState,
-  request = publicGameRequest, socket = io({
-    autoConnect: false, withCredentials: true, auth: { gameId, public: true },
+export function createDisplayConnection({
+  gameId,
+  onState,
+  request = publicGameRequest,
+  socket = io(`${SOCKET_URL}${SOCKET_NAMESPACE}`, {
+    path: SOCKET_PATH,
+    autoConnect: false,
+    withCredentials: true,
+    auth: { gameId, public: true },
     reconnectionDelayMax: 5000
-  }) }) {
+  })
+}) {
   let stopped = false;
   let joined = false;
   let generation = 0;
