@@ -38,8 +38,9 @@ export function useControllerLease(session, gameId, { autoAcquire = false } = {}
     + Math.max(0, monotonicNow - (query.data?.receivedAt ?? monotonicNow));
   const remainingSeconds = controller?.expiresAt
     ? Math.max(0, Math.ceil((Date.parse(controller.expiresAt) - estimatedServerTime) / 1000)) : 0;
-  const active = Boolean(controller?.holderUserId && remainingSeconds > 0);
-  const ownsLease = active && controller.holderUserId === session.user.id && credentialVersion !== null
+  const isHolder = Boolean(controller?.holderUserId && controller.holderUserId === session.user.id);
+  const active = Boolean(controller?.holderUserId && (remainingSeconds > 0 || isHolder));
+  const ownsLease = active && isHolder && credentialVersion !== null
     && controller.version === credentialVersion && command.error?.code !== 'CONTROLLER_NOT_HELD';
   const status = query.data?.data?.game?.status;
   const allowed = ['RUNNING', 'PAUSED'].includes(status);
@@ -49,13 +50,7 @@ export function useControllerLease(session, gameId, { autoAcquire = false } = {}
     const interval = window.setInterval(() => setMonotonicNow(globalThis.performance.now()), 1000);
     return () => window.clearInterval(interval);
   }, []);
-  useEffect(() => {
-    if (!ownsLease || !online || !allowed || command.uncertain || command.error) return;
-    const interval = window.setInterval(() => execute({
-      path: `/${gameId}/controller/heartbeat`, method: 'POST', body: { controllerLeaseToken: token.current }
-    }), 10000);
-    return () => window.clearInterval(interval);
-  }, [ownsLease, online, allowed, command.uncertain, command.error, execute, gameId]);
+  // Heartbeat interval is omitted: in single-admin mode, lease is optional and background heartbeats are not needed.
   useEffect(() => {
     if (command.error?.status === 409) reload();
   }, [command.error, reload]);
@@ -122,7 +117,7 @@ export function useControllerLease(session, gameId, { autoAcquire = false } = {}
         ...(targetTeamId ? { teamId: targetTeamId } : {}),
         expectedStateVersion: query.data.meta.stateVersion,
         expectedTurnNumber: (query.data?.data?.game?.turnNumber ?? 0) + 1,
-        controllerLeaseToken: token.current
+        ...(token.current ? { controllerLeaseToken: token.current } : {})
       }
     });
   }

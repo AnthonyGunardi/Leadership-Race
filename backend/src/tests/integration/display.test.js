@@ -54,9 +54,9 @@ afterAll(async () => {
 });
 
 /** Exercises the real public/admin handshake; cookie-only handshakes must fail. */
-async function connectGame(auth, extraHeaders = {}) {
+async function connectGame(auth, extraHeaders = {}, namespace = '') {
   const { gameId } = auth;
-  const socket = io(baseUrl.replace('/api/v1', ''), { autoConnect: false, reconnection: false,
+  const socket = io(`${baseUrl.replace('/api/v1', '')}${namespace}`, { autoConnect: false, reconnection: false,
     extraHeaders, auth });
   sockets.push(socket);
   await new Promise((resolve, reject) => {
@@ -93,7 +93,7 @@ it('serves public snapshots/replay and two sockets without pairing, with admin r
   expect(created.status).toBe(200);
   const id = created.body.data.game.id;
   const display = await connectGame({ gameId: id, public: true });
-  const secondDisplay = await connectGame({ gameId: id, public: true });
+  const secondDisplay = await connectGame({ gameId: id, public: true }, {}, '/leadership-race');
   const adminSocket = await connectGame({ gameId: id, accessToken });
   const denied = await display.timeout(2000).emitWithAck('game:join', { gameId: randomUUID() });
   expect(denied.error.code).toBe('FORBIDDEN');

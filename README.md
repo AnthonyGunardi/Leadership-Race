@@ -4,6 +4,8 @@ Aplikasi web interaktif untuk mengelola giliran, posisi tim, skor, dan menampilk
 
 Sistem dirancang dengan arsitektur **single operational game**, sinkronisasi *real-time* berbasis Socket.IO, jaminan integritas data ACID melalui MySQL/MariaDB InnoDB, dan antarmuka display tanpa gesekan (*zero-friction public display* tanpa login atau kode pairing).
 
+![F1 Leadership Race - Main Display Board](screenshots/01.png)
+
 ---
 
 ## Daftar Isi

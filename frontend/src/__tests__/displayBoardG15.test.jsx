@@ -174,4 +174,19 @@ describe('G15 minimal display and token clustering', () => {
       expect(screen.queryByRole('button')).not.toBeInTheDocument();
     });
   });
+
+  describe('Zigzag circuit navigation arrows (CSS layout rules)', () => {
+    it('excludes transition cells 20 and 40 from left-pointing arrows so they point downwards', async () => {
+      const fs = await import('node:fs');
+      const { fileURLToPath } = await import('node:url');
+      const cssPath = fileURLToPath(new globalThis.URL('../pages/displayBoard.css', import.meta.url));
+      const cssContent = fs.readFileSync(cssPath, 'utf8');
+
+      // Row 2 left-arrow rule must stop at 19, row 4 at 39 (cells 20 and 40 point down to next row)
+      expect(cssContent).toMatch(/\.board-cell:nth-child\(n \+ 11\):nth-child\(-n \+ 19\)::after/);
+      expect(cssContent).toMatch(/\.board-cell:nth-child\(n \+ 31\):nth-child\(-n \+ 39\)::after/);
+      // Row ends 10, 20, 30, 40 must match 10n pointing downwards
+      expect(cssContent).toMatch(/\.board-cell:nth-child\(10n\)::after/);
+    });
+  });
 });

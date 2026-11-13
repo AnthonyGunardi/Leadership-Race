@@ -24,39 +24,43 @@ export function createGameGateway({ server, sequelize, scanIntervalMs = 1000, pu
     socket.emit('session:invalidated', { code: error.status === 503 ? 'SERVICE_UNAVAILABLE' : 'UNAUTHENTICATED' });
     socket.disconnect(true);
   }
-  io.use(async (socket, next) => {
-    try {
-      const input = socketAuthSchema.parse(socket.handshake.auth);
-      socket.data.identity = input;
-      await authorize(socket);
-      next();
-    } catch (error) {
-      const failure = new Error('Koneksi display tidak diotorisasi.');
-      failure.data = { code: error.status === 503 ? 'SERVICE_UNAVAILABLE' : 'UNAUTHENTICATED' };
-      next(failure);
-    }
-  });
-  io.on('connection', (socket) => {
-    socket.on('game:join', async (raw, ack) => {
-      if (typeof ack !== 'function') return;
+  const namespaces = [io.of('/'), io.of('/leadership-race')];
+  for (const nsp of namespaces) {
+    nsp.use(async (socket, next) => {
       try {
-        const { gameId } = socketJoinSchema.parse(raw);
-        if (gameId !== socket.data.identity.gameId) throw new GameError('FORBIDDEN', 'Scope game tidak sah.', 403);
+        const input = socketAuthSchema.parse(socket.handshake.auth);
+        socket.data.identity = input;
         await authorize(socket);
-        await getGameSnapshot({ sequelize, gameId });
-        if (!socket.connected) return;
-        await socket.join(`game:${gameId}`);
-        ack({ success: true, data: { gameId } });
+        next();
       } catch (error) {
-        ack({ success: false, error: { code: error.code || 'VALIDATION_ERROR', message: 'Subscription ditolak.' } });
+        const failure = new Error('Koneksi display tidak diotorisasi.');
+        failure.data = { code: error.status === 503 ? 'SERVICE_UNAVAILABLE' : 'UNAUTHENTICATED' };
+        next(failure);
       }
     });
-    socket.on('game:leave', () => socket.leave(`game:${socket.data.identity.gameId}`));
-  });
+    nsp.on('connection', (socket) => {
+      socket.on('game:join', async (raw, ack) => {
+        if (typeof ack !== 'function') return;
+        try {
+          const { gameId } = socketJoinSchema.parse(raw);
+          if (gameId !== socket.data.identity.gameId) throw new GameError('FORBIDDEN', 'Scope game tidak sah.', 403);
+          await authorize(socket);
+          await getGameSnapshot({ sequelize, gameId });
+          if (!socket.connected) return;
+          await socket.join(`game:${gameId}`);
+          ack({ success: true, data: { gameId } });
+        } catch (error) {
+          ack({ success: false, error: { code: error.code || 'VALIDATION_ERROR', message: 'Subscription ditolak.' } });
+        }
+      });
+      socket.on('game:leave', () => socket.leave(`game:${socket.data.identity.gameId}`));
+    });
+  }
   let securityScan = null;
   const scan = setInterval(() => {
     if (securityScan) return;
-    securityScan = Promise.all([...io.of('/').sockets.values()].map(async (socket) => {
+    const allSockets = namespaces.flatMap((nsp) => [...nsp.sockets.values()]);
+    securityScan = Promise.all(allSockets.map(async (socket) => {
       try { await authorize(socket); } catch (error) { invalidate(socket, error); }
     })).finally(() => { securityScan = null; });
   }, scanIntervalMs);
@@ -64,7 +68,8 @@ export function createGameGateway({ server, sequelize, scanIntervalMs = 1000, pu
   const publisher = createOutboxPublisher({ sequelize, intervalMs: publishIntervalMs,
     publish: async (event) => {
       const room = `game:${event.gameId}`;
-      for (const socket of io.of('/').sockets.values()) {
+      const allSockets = namespaces.flatMap((nsp) => [...nsp.sockets.values()]);
+      for (const socket of allSockets) {
         if (!socket.rooms.has(room)) continue;
         try { await authorize(socket); } catch (error) { invalidate(socket, error); continue; }
         // Never broadcast directly to a room: an authorization failure must prevent this outbound payload.

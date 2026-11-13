@@ -5,7 +5,7 @@ const rollDiceSchema = gameVersionSchema.extend({
   teamId: z.string().uuid().optional(),
   diceValue: z.number().int().min(1).max(6),
   expectedTurnNumber: z.number().int().min(1).optional(),
-  controllerLeaseToken: z.string().regex(/^[a-f0-9]{64}$/)
+  controllerLeaseToken: z.string().regex(/^[a-f0-9]{64}$/).optional()
 });
 
 const buttonResultSchema = gameVersionSchema.extend({

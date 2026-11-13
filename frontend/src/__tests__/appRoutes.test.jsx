@@ -50,10 +50,26 @@ describe('Public board and fallback routes', () => {
 
     expect(screen.getByText('F1 Leadership Race')).toBeInTheDocument();
     expect(container.querySelectorAll('.race-grid > li')).toHaveLength(50);
+    expect(screen.getByRole('note')).toHaveTextContent(/laptop \/ PC for the optimal gameboard experience/i);
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith('/api/v1/public/game', expect.objectContaining({ method: 'GET' }));
     });
+  });
+
+  it.each(['/leaderboard', '/final'])('renders %s with unified board-simple style and without mobile gameboard notice', async (path) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, status: 200, json: async () => ({
+        success: true,
+        data: { game: { id: null, name: 'Race preview', status: 'DRAFT' }, teams: [], boardCells: [], leaderboard: [] },
+        meta: { stateVersion: 0, eventSequence: 0, serverTime: '2026-11-11T00:00:00.000Z' }
+      })
+    }));
+    window.history.replaceState({}, '', path);
+    const { container } = render(<App queryClient={testQueryClient} />);
+    const main = container.querySelector('main');
+    expect(main).toHaveClass('board-simple');
+    expect(container.querySelector('.mobile-gameboard-notice')).toBeNull();
   });
 
   it('renders NotFoundPage with 404 message and home link', () => {

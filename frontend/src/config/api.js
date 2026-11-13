@@ -16,7 +16,9 @@ export const SOCKET_URL = (
 /**
  * Namespace Socket.IO khusus untuk modul Leadership Race.
  */
-export const SOCKET_NAMESPACE = '/leadership-race';
+export const SOCKET_NAMESPACE = (
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SOCKET_NAMESPACE) || '/leadership-race'
+);
 
 /**
  * Path transport default Socket.IO pada server host.

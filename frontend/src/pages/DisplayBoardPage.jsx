@@ -25,6 +25,10 @@ export function DisplayBoardPage() {
               </span>}
             </h1>
           </header>
+          <div className="mobile-gameboard-notice" role="note">
+            <span className="mobile-notice-badge">Screen Recommendation</span>
+            <p>Please use a laptop / PC for the optimal gameboard experience.</p>
+          </div>
           <div className="display-main-arena">
             <section className="board-stage" aria-label="Board game area">
               {display.view ? <RaceBoard view={display.view} /> : (

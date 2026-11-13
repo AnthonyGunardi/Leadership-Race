@@ -3,6 +3,7 @@ import { useDisplayBoard } from '../hooks/useDisplayBoard.js';
 import { LeaderboardPanel } from '../components/LeaderboardPanel.jsx';
 import { Icon } from '../components/Icon.jsx';
 import './displayBoard.css';
+import './boardSimple.css';
 
 /**
  * DisplayFinalPage presents the big-screen celebration and final ranking after game is FINISHED.
@@ -16,7 +17,7 @@ export function DisplayFinalPage() {
   const winners = display.view?.leaderboard?.filter((team) => team.rank === 1) ?? [];
 
   return (
-    <main className="display-board display-final">
+    <main className="display-board board-simple display-final">
       <header className="display-header">
         <div className="display-title-group">
           <p>F1 Leadership Race</p>

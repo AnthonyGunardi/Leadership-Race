@@ -54,13 +54,15 @@ export async function rollDice({
         throw new GameError('GAME_NOT_READY', 'Game belum dimulai atau tidak aktif.', 409);
       }
 
-      await assertControllerLease({
-        sequelize,
-        transaction,
-        gameId,
-        actorUserId,
-        controllerLeaseToken: input.controllerLeaseToken
-      });
+      if (input.controllerLeaseToken !== undefined) {
+        await assertControllerLease({
+          sequelize,
+          transaction,
+          gameId,
+          actorUserId,
+          controllerLeaseToken: input.controllerLeaseToken
+        });
+      }
 
       if (safeInteger(game.stateVersion) !== input.expectedStateVersion) {
         throw new GameError('STALE_STATE', 'State game telah berubah. Muat ulang sebelum melakukan roll.', 409);

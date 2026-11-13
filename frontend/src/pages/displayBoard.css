@@ -74,7 +74,7 @@
 .category-UNCONFIGURED { --tile-face: #e0e5ec; --tile-rim: #87909f; --tile-ink: #374151; }
 .board-cell:hover { border-color: var(--tile-ink); }
 .board-cell::after { content: ''; position: absolute; right: -7px; top: 48%; width: 4px; height: 4px; border-top: 1px solid #505c6d; border-right: 1px solid #505c6d; transform: rotate(45deg); }
-.board-cell:nth-child(n + 11):nth-child(-n + 20)::after, .board-cell:nth-child(n + 31):nth-child(-n + 40)::after { right: auto; left: -7px; transform: rotate(225deg); }
+.board-cell:nth-child(n + 11):nth-child(-n + 19)::after, .board-cell:nth-child(n + 31):nth-child(-n + 39)::after { right: auto; left: -7px; transform: rotate(225deg); }
 .board-cell:nth-child(10n)::after { right: 48%; left: auto; top: auto; bottom: -8px; transform: rotate(135deg); }
 .board-cell:last-of-type::after { display: none; }
 

@@ -2,6 +2,7 @@ import { Link } from 'react-router';
 import { useDisplayBoard } from '../hooks/useDisplayBoard.js';
 import { LeaderboardPanel } from '../components/LeaderboardPanel.jsx';
 import './displayBoard.css';
+import './boardSimple.css';
 
 /**
  * DisplayLeaderboardPage renders a fullscreen read-only leaderboard for audience displays.
@@ -13,7 +14,7 @@ export function DisplayLeaderboardPage() {
   const game = display.view?.game;
 
   return (
-    <main className="display-board display-leaderboard-fullscreen">
+    <main className="display-board board-simple display-leaderboard-fullscreen">
       <header className="display-header">
         <div className="display-title-group">
           <p>F1 Leadership Race</p>

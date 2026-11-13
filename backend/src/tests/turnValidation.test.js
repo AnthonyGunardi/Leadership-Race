@@ -95,8 +95,20 @@ describe('validateTurnRequest middleware', () => {
     }
   });
 
-  it('rejects invalid or missing controllerLeaseToken', () => {
-    for (const invalidToken of ['too-short', 'z'.repeat(64), 12345, null, undefined]) {
+  it('accepts valid roll request when controllerLeaseToken is omitted (single-admin mode)', () => {
+    const req = createRequest({
+      diceValue: 3,
+      expectedStateVersion: 1
+    });
+    const next = vi.fn();
+    rollMiddleware(req, {}, next);
+
+    expect(next).toHaveBeenCalledWith();
+    expect(req.gameInput.input.controllerLeaseToken).toBeUndefined();
+  });
+
+  it('rejects invalid controllerLeaseToken when provided as malformed value', () => {
+    for (const invalidToken of ['too-short', 'z'.repeat(64), 12345, null]) {
       const req = createRequest({
         diceValue: 3,
         expectedStateVersion: 1,
