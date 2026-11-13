@@ -14,14 +14,17 @@ import { ensureCurrentGame, resetCurrentGame, listGameArchives } from '../servic
 function commandController(service) {
   return async (req, res, next) => {
     try {
+      const tStart = Date.now();
       const sequelize = req.app.locals.sequelize || getSequelize();
       const movementWorker = req.app.locals.movementWorker;
       const result = await service({
         sequelize, actorUserId: req.admin?.user?.id, requestId: req.id, movementWorker, ...req.gameInput
       });
+      const durationMs = Date.now() - tStart;
       res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('Server-Timing', `total;dur=${durationMs}`);
       res.status(result.status).json({ ...result.body, meta: {
-        ...result.body.meta, requestId: req.id, serverTime: (await databaseNow(sequelize)).toISOString()
+        ...result.body.meta, requestId: req.id, durationMs, serverTime: (await databaseNow(sequelize)).toISOString()
       } });
     } catch (error) {
       next(error);
@@ -33,11 +36,20 @@ function commandController(service) {
 function readController(service) {
   return async (req, res, next) => {
     try {
+      const tStart = Date.now();
       const result = await service({
         sequelize: req.app.locals.sequelize || getSequelize(), requestId: req.id, ...req.gameInput
       });
+      const durationMs = Date.now() - tStart;
       res.setHeader('Cache-Control', 'no-store');
-      res.json(result);
+      res.setHeader('Server-Timing', `total;dur=${durationMs}`);
+      res.json({
+        ...result,
+        meta: {
+          ...result?.meta,
+          durationMs
+        }
+      });
     } catch (error) {
       next(error);
     }

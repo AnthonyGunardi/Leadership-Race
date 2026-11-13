@@ -5,9 +5,18 @@ import { getPublicGame, getPublicGameEvents } from '../services/singleGame.js';
 function publicController(service) {
   return async (req, res, next) => {
     try {
+      const tStart = Date.now();
       const result = await service({ sequelize: req.app.locals.sequelize || getSequelize(), ...req.gameInput });
+      const durationMs = Date.now() - tStart;
       res.setHeader('Cache-Control', 'no-store');
-      res.json(result);
+      res.setHeader('Server-Timing', `total;dur=${durationMs}`);
+      res.json({
+        ...result,
+        meta: {
+          ...result?.meta,
+          durationMs
+        }
+      });
     } catch (error) {
       next(error);
     }

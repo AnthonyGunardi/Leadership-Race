@@ -21,6 +21,8 @@ const server = http.createServer(app);
 const gateway = createGameGateway({ server, sequelize });
 const movementWorker = createMovementWorker({ sequelize });
 app.locals.movementWorker = movementWorker;
+app.locals.gameGateway = gateway;
+app.locals.outboxPublisher = gateway.publisher;
 app.locals.isRealtimeReady = () => gateway.publisher.isReady();
 app.locals.isWorkerReady = () => movementWorker.isReady();
 

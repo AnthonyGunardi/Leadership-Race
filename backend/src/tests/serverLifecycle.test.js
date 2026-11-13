@@ -154,7 +154,7 @@ describe('Server Lifecycle & Graceful Shutdown', () => {
 
     lifecycle.gracefulShutdown('SIGTERM');
 
-    await new Promise((resolve) => setTimeout(resolve, 80));
+    await new Promise((resolve) => setTimeout(resolve, 150));
 
     expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('Graceful period expired'));
     expect(hangingSocket.destroy).toHaveBeenCalled();

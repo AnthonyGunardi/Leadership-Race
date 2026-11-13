@@ -6,6 +6,7 @@ import { rollDice, recordChallengeResult, voidTurn, getGameLeaderboard } from '.
 function commandController(service) {
   return async (req, res, next) => {
     try {
+      const tStart = Date.now();
       const sequelize = req.app.locals.sequelize || getSequelize();
       const movementWorker = req.app.locals.movementWorker;
       const result = await service({
@@ -15,12 +16,19 @@ function commandController(service) {
         movementWorker,
         ...req.gameInput
       });
+      const publisher = req.app.locals.outboxPublisher;
+      if (publisher && typeof publisher.tick === 'function') {
+        publisher.tick().catch(() => {});
+      }
+      const durationMs = Date.now() - tStart;
       res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('Server-Timing', `total;dur=${durationMs}`);
       res.status(result.status).json({
         ...result.body,
         meta: {
           ...result.body.meta,
           requestId: req.id,
+          durationMs,
           serverTime: (await databaseNow(sequelize)).toISOString()
         }
       });

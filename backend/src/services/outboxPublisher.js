@@ -8,6 +8,7 @@ import { logger } from '../config/logger.js';
 export function createOutboxPublisher({ sequelize, publish, intervalMs = 250 }) {
   const { OutboxEvent, GameEvent } = defineGameSetup(sequelize);
   let active = null;
+  let pendingDrain = false;
   let stopped = false;
   let lastSuccess = 0;
   async function drain() {
@@ -29,9 +30,19 @@ export function createOutboxPublisher({ sequelize, publish, intervalMs = 250 }) 
     }
     lastSuccess = Date.now();
   }
+  async function runDrainLoop() {
+    do {
+      pendingDrain = false;
+      await drain();
+    } while (pendingDrain && !stopped);
+  }
   function tick() {
-    if (!active && !stopped) {
-      active = drain().catch(() => {
+    if (active) {
+      pendingDrain = true;
+      return active;
+    }
+    if (!stopped) {
+      active = runDrainLoop().catch(() => {
         lastSuccess = 0;
         logger.error('Outbox scan failed');
       }).finally(() => { active = null; });
