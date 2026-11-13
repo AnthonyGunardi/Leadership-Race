@@ -54,8 +54,11 @@ export function getMovementFlags(movement) {
  *
  * @param {Object} movement - Normalized movement payload
  * @param {number} serverNowMs - Estimated server epoch time in milliseconds
+ * @param {Object} [options] - Progress clamping and start state options
+ * @param {number} [options.minElapsedMs=0] - Monotonic elapsed floor for active turn
+ * @param {boolean} [options.hasStarted=false] - Whether turn has transitioned past STARTING
  */
-export function calculateMovementTimeline(movement, serverNowMs) {
+export function calculateMovementTimeline(movement, serverNowMs, { minElapsedMs = 0, hasStarted = false } = {}) {
   if (!movement || !Array.isArray(movement.fullPath) || movement.fullPath.length === 0) {
     return {
       movement: null,
@@ -63,50 +66,87 @@ export function calculateMovementTimeline(movement, serverNowMs) {
       phase: 'IDLE',
       stepIndex: -1,
       currentCell: null,
+      prevCell: null,
+      subStepProgress: 0,
       isBounce: false,
       hasPenalty: false,
       statusLabel: 'IDLE',
-      progress: 0
+      progress: 0,
+      hasStarted: false,
+      elapsedMs: 0
     };
   }
 
   const startMs = Date.parse(movement.startAt);
   const endMs = Date.parse(movement.endAt);
+  const stepDuration = Math.max(50, movement.stepDurationMs || 450);
+  const totalDuration = Math.max(stepDuration, movement.fullPath.length * stepDuration);
   const { isBounce, hasPenalty } = getMovementFlags(movement);
 
-  if (Number.isNaN(startMs) || Number.isNaN(endMs) || serverNowMs >= endMs) {
+  if (Number.isNaN(startMs) || Number.isNaN(endMs)) {
     return {
       movement,
       isMoving: false,
       phase: 'LANDED',
       stepIndex: movement.fullPath.length - 1,
       currentCell: movement.finalPosition,
+      prevCell: movement.fullPath.length > 1 ? movement.fullPath[movement.fullPath.length - 2] : movement.from,
+      subStepProgress: 1,
       isBounce,
       hasPenalty,
       statusLabel: 'LANDING',
-      progress: 1
+      progress: 1,
+      hasStarted: true,
+      elapsedMs: totalDuration
     };
   }
 
-  if (serverNowMs < startMs) {
+  const rawElapsedMs = serverNowMs - startMs;
+
+  if (rawElapsedMs < 0 && !hasStarted) {
     return {
       movement,
       isMoving: false,
       phase: 'STARTING',
       stepIndex: -1,
       currentCell: movement.from,
+      prevCell: movement.from,
+      subStepProgress: 0,
       isBounce,
       hasPenalty,
       statusLabel: hasPenalty ? 'MUNDUR' : 'BERSIAP',
-      progress: 0
+      progress: 0,
+      hasStarted: false,
+      elapsedMs: 0
     };
   }
 
-  const elapsedMs = Math.max(0, serverNowMs - startMs);
-  const stepDuration = Math.max(50, movement.stepDurationMs || 450);
-  const stepIndex = Math.min(movement.fullPath.length - 1, Math.floor(elapsedMs / stepDuration));
+  const effectiveElapsedMs = Math.max(minElapsedMs, Math.max(0, rawElapsedMs));
+
+  if (effectiveElapsedMs >= totalDuration || serverNowMs >= endMs) {
+    return {
+      movement,
+      isMoving: false,
+      phase: 'LANDED',
+      stepIndex: movement.fullPath.length - 1,
+      currentCell: movement.finalPosition,
+      prevCell: movement.fullPath.length > 1 ? movement.fullPath[movement.fullPath.length - 2] : movement.from,
+      subStepProgress: 1,
+      isBounce,
+      hasPenalty,
+      statusLabel: 'LANDING',
+      progress: 1,
+      hasStarted: true,
+      elapsedMs: totalDuration
+    };
+  }
+
+  const stepIndex = Math.min(movement.fullPath.length - 1, Math.floor(effectiveElapsedMs / stepDuration));
+  const subStepMs = effectiveElapsedMs % stepDuration;
+  const subStepProgress = Math.min(1, Math.max(0, subStepMs / stepDuration));
   const currentCell = movement.fullPath[stepIndex];
-  const progress = Math.min(1, Math.max(0, elapsedMs / Math.max(1, endMs - startMs)));
+  const prevCell = stepIndex === 0 ? movement.from : movement.fullPath[stepIndex - 1];
+  const progress = Math.min(1, Math.max(0, effectiveElapsedMs / totalDuration));
 
   let phase = 'MOVING';
   let statusLabel = 'BERGERAK';
@@ -122,9 +162,13 @@ export function calculateMovementTimeline(movement, serverNowMs) {
     phase,
     stepIndex,
     currentCell,
+    prevCell,
+    subStepProgress,
     isBounce,
     hasPenalty,
     statusLabel,
-    progress
+    progress,
+    hasStarted: true,
+    elapsedMs: effectiveElapsedMs
   };
 }

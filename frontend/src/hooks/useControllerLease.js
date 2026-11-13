@@ -11,7 +11,7 @@ import { useGameCommand, useGameConnectivity } from './useGames.js';
 export function useControllerLease(session, gameId, { autoAcquire = false } = {}) {
   const token = useRef(null);
   const [credentialVersion, setCredentialVersion] = useState(null);
-  const [monotonicNow, setMonotonicNow] = useState(() => globalThis.performance.now());
+  const [monotonicNow, _setMonotonicNow] = useState(() => globalThis.performance.now());
   const online = useGameConnectivity();
   const query = useQuery({
     queryKey: ['controller', session.user.id, gameId],

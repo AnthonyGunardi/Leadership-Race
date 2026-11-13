@@ -75,3 +75,43 @@ it('connects a public display using GET only, without pairing or session synchro
     expect(request.mock.calls.some(([call]) => call.path.includes('display-session'))).toBe(false);
   } finally { connection.stop(); }
 });
+
+it('skips redundant /events call on steady-state live notification when snapshot covers sequence', async () => {
+  const socket = transport();
+  const states = [];
+  let currentSequence = 1;
+  const request = vi.fn(async ({ path }) => {
+    if (path.includes('/snapshot')) {
+      return snapshot(currentSequence);
+    }
+    return { data: { events: [] }, meta: { nextAfterSequence: currentSequence, hasMore: false } };
+  });
+
+  const connection = createDisplayConnection({
+    gameId,
+    socket,
+    request,
+    onState: (state) => states.push(state)
+  });
+
+  try {
+    socket.connect();
+    await vi.waitFor(() => expect(states.at(-1)?.status).toBe('connected'));
+    expect(states.at(-1).snapshot.meta.eventSequence).toBe(1);
+
+    // Initial connection fetched /snapshot only, not /events
+    expect(request.mock.calls.some(([call]) => call.path.includes('/events?'))).toBe(false);
+
+    // Live notification for sequence 2 arrives; snapshot fetched during recovery returns sequence 2
+    currentSequence = 2;
+    socket.event(makeEvent(2));
+
+    await vi.waitFor(() => expect(states.at(-1)?.snapshot?.meta.eventSequence).toBe(2));
+
+    // Because snapshot covered sequence 2 (cursor >= bufferedHighWater), /events was not called
+    expect(request.mock.calls.some(([call]) => call.path.includes('/events?'))).toBe(false);
+  } finally {
+    connection.stop();
+  }
+});
+

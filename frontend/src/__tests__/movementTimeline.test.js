@@ -239,4 +239,47 @@ describe('Movement timeline service', () => {
     expect(postFlight.phase).toBe('LANDED');
     expect(postFlight.currentCell).toBe(22);
   });
+
+  it('calculates subStepProgress and prevCell adaptively for mid-step reconnect and dynamic duration', () => {
+    const startMs = Date.parse('2026-11-10T10:00:00.000Z');
+    const movement = normalizeMovement({
+      turnId: 't-adaptive',
+      from: 10,
+      diceValue: 3,
+      dicePath: [11, 12, 13],
+      fullPath: [11, 12, 13],
+      landingCell: 13,
+      finalPosition: 13,
+      startAt: new Date(startMs).toISOString(),
+      endAt: new Date(startMs + 3 * 500).toISOString(),
+      stepDurationMs: 500
+    });
+
+    // 1. Reconnect during glide phase (150ms into step 0)
+    const midGlide = calculateMovementTimeline(movement, startMs + 150);
+    expect(midGlide.stepIndex).toBe(0);
+    expect(midGlide.currentCell).toBe(11);
+    expect(midGlide.prevCell).toBe(10);
+    expect(midGlide.subStepProgress).toBeCloseTo(0.3, 2);
+
+    // 2. Reconnect during stationary phase (350ms into step 0)
+    const midStationary = calculateMovementTimeline(movement, startMs + 350);
+    expect(midStationary.stepIndex).toBe(0);
+    expect(midStationary.currentCell).toBe(11);
+    expect(midStationary.prevCell).toBe(10);
+    expect(midStationary.subStepProgress).toBeCloseTo(0.7, 2);
+
+    // 3. Step 1 prevCell points to step 0 destination (11)
+    const step1 = calculateMovementTimeline(movement, startMs + 600);
+    expect(step1.stepIndex).toBe(1);
+    expect(step1.currentCell).toBe(12);
+    expect(step1.prevCell).toBe(11);
+    expect(step1.subStepProgress).toBeCloseTo(0.2, 2);
+
+    // 4. Clamping with minElapsedMs enforces monotonicity
+    const clamped = calculateMovementTimeline(movement, startMs + 200, { minElapsedMs: 600 });
+    expect(clamped.stepIndex).toBe(1);
+    expect(clamped.currentCell).toBe(12);
+    expect(clamped.elapsedMs).toBe(600);
+  });
 });

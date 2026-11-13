@@ -60,26 +60,28 @@ export function createDisplayConnection({
       if (current && (sequence < current.meta.eventSequence || version < current.meta.stateVersion)) continue;
       let cursor = sequence;
       let page;
-      try {
-        do {
-          page = await call(`/events?afterSequence=${cursor}`);
-          if (!Array.isArray(page.data?.events)) throw new Error('Invalid replay events.');
-          for (const event of page.data.events) {
-            if (!validEvent(event, gameId) || event.sequence !== cursor + 1) {
-              throw new Error('Incomplete event sequence.');
-            }
-            cursor = event.sequence;
-          }
-          if (page.meta.nextAfterSequence !== cursor || (page.meta.hasMore && page.data.events.length === 0)) {
-            throw new Error('Invalid event cursor.');
-          }
-        } while (page.meta.hasMore && !stopped && epoch === generation);
-      } catch (error) {
-        if (['EVENT_HISTORY_UNAVAILABLE', 'STALE_STATE'].includes(error.code)) continue;
-        throw error;
-      }
       const bufferedHighWater = Math.max(sequence, ...buffer.keys());
-      if (cursor > sequence || bufferedHighWater > sequence) continue;
+      if (bufferedHighWater > sequence) {
+        try {
+          do {
+            page = await call(`/events?afterSequence=${cursor}`);
+            if (!Array.isArray(page.data?.events)) throw new Error('Invalid replay events.');
+            for (const event of page.data.events) {
+              if (!validEvent(event, gameId) || event.sequence !== cursor + 1) {
+                throw new Error('Incomplete event sequence.');
+              }
+              cursor = event.sequence;
+            }
+            if (page.meta.nextAfterSequence !== cursor || (page.meta.hasMore && page.data.events.length === 0)) {
+              throw new Error('Invalid event cursor.');
+            }
+          } while (page.meta.hasMore && !stopped && epoch === generation);
+        } catch (error) {
+          if (['EVENT_HISTORY_UNAVAILABLE', 'STALE_STATE'].includes(error.code)) continue;
+          throw error;
+        }
+        if (cursor < bufferedHighWater) continue;
+      }
       if (stopped || !joined || epoch !== generation) return;
       current = snapshot;
       for (const sequence of buffer.keys()) {
@@ -101,7 +103,7 @@ export function createDisplayConnection({
       recovering = null;
       if (!stopped && joined && (epoch !== generation || buffer.size > 0)) {
         clearTimeout(retryTimer);
-        retryTimer = setTimeout(scheduleRecovery, 1000);
+        retryTimer = setTimeout(scheduleRecovery, buffer.size > 0 ? 0 : 1000);
       }
     });
   }

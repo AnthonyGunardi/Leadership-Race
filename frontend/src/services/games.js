@@ -3,6 +3,8 @@ import { API_BASE_URL } from '../config/api.js';
 /** Game transport carries credentials only in headers and preserves command keys across uncertain retries. */
 export async function gameRequest({ accessToken, path = '', method = 'GET', body, key, signal,
   basePath = `${API_BASE_URL}/api/v1/games` }) {
+  const tFetchStart = (typeof globalThis.performance !== 'undefined' && typeof globalThis.performance.now === 'function')
+    ? globalThis.performance.now() : Date.now();
   let response;
   try {
     response = await fetch(`${basePath}${path}`, {
@@ -24,6 +26,27 @@ export async function gameRequest({ accessToken, path = '', method = 'GET', body
     throw Object.assign(new Error('Server response could not be read. Retry the same action.'), {
       code: 'INVALID_RESPONSE', unknownOutcome: method !== 'GET'
     });
+  }
+  const tFetchEnd = (typeof globalThis.performance !== 'undefined' && typeof globalThis.performance.now === 'function')
+    ? globalThis.performance.now() : Date.now();
+  if (payload && payload.meta && payload.meta.serverTime) {
+    const parsed = Date.parse(payload.meta.serverTime);
+    if (!Number.isNaN(parsed)) {
+      const totalRtt = Math.max(0, tFetchEnd - tFetchStart);
+      let serverProcessingMs = Number.isFinite(payload.meta.durationMs) ? Math.max(0, payload.meta.durationMs) : null;
+      if (serverProcessingMs === null && typeof response?.headers?.get === 'function') {
+        const timingHeader = response.headers.get('Server-Timing');
+        const match = timingHeader ? /dur=([0-9.]+)/.exec(timingHeader) : null;
+        if (match) serverProcessingMs = Math.max(0, parseFloat(match[1]));
+      }
+      const safeServerMs = Number.isFinite(serverProcessingMs) ? serverProcessingMs : 0;
+      const networkRtt = Math.max(0, totalRtt - safeServerMs);
+      const downlinkTransitMs = networkRtt / 2;
+      payload.meta.anchor = {
+        serverTimeAtRecvMs: parsed + downlinkTransitMs,
+        localMonotonicRecvMs: tFetchEnd
+      };
+    }
   }
   if (!response.ok || payload?.success !== true) {
     throw Object.assign(new Error(payload?.error?.message || 'Game request failed.'), {

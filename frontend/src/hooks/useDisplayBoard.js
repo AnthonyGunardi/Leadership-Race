@@ -36,17 +36,23 @@ export function useDisplayBoard() {
 
   const confirmed = state.snapshot && state.snapshot.data?.game?.id === subscribedGameId ? state.snapshot : null;
   const polled = current.data;
-  const snapshot = polled && (!confirmed || polled.meta.eventSequence >= confirmed.meta.eventSequence)
-    ? polled : confirmed || initialBoard;
+  const snapshot = polled && (!confirmed || polled.meta.eventSequence > confirmed.meta.eventSequence)
+    ? polled
+    : confirmed || initialBoard;
   const activeMovement = snapshot?.data?.activeMovement || null;
   const serverTime = snapshot?.meta?.serverTime || null;
+  const anchor = snapshot?.meta?.anchor || null;
 
-  const timeline = useMovementTimeline({ activeMovement, serverTime });
+  const timeline = useMovementTimeline({ activeMovement, serverTime, anchor });
   const view = buildBoardView(snapshot, timeline);
-  const status = current.isError ? 'disconnected'
-    : !subscribedGameId && current.isSuccess ? 'connected'
-    : (state.status === 'connected' || (current.isSuccess && polled?.data?.game?.id === subscribedGameId))
-      ? 'connected' : state.status;
+  let status = state.status;
+  if (current.isError) {
+    status = 'disconnected';
+  } else if (!subscribedGameId && current.isSuccess) {
+    status = 'connected';
+  } else if (state.status === 'connected' || (current.isSuccess && polled?.data?.game?.id === subscribedGameId)) {
+    status = 'connected';
+  }
 
   return {
     ...state,

@@ -77,4 +77,108 @@ describe('Server-scheduled movement hook', () => {
     rerender({ activeMovement: { turnId: 'invalid' }, serverTime: 'invalid' });
     expect(result.current).toMatchObject({ phase: 'IDLE', currentCell: null });
   });
+
+  it('prevents backward progress jump when serverTime jitters backwards during active movement', () => {
+    const { result, rerender } = renderHook((props) => useMovementTimeline(props), {
+      initialProps: {
+        activeMovement: movement,
+        serverTime: new Date(serverNow).toISOString()
+      }
+    });
+
+    // Advance to cell 4 (elapsed = 400ms start delay + 450ms step 0 + 100ms into step 1 = 950ms)
+    act(() => vi.advanceTimersByTime(950));
+    expect(result.current).toMatchObject({ isMoving: true, currentCell: 4, stepIndex: 1 });
+
+    // Snapshot refresh with aged timestamp (simulating 200ms backwards skew)
+    rerender({
+      activeMovement: movement,
+      serverTime: new Date(Date.now() - 200).toISOString()
+    });
+
+    // Monotonic guard ensures token does NOT regress to cell 3
+    expect(result.current.currentCell).toBe(4);
+    expect(result.current.stepIndex).toBe(1);
+    expect(result.current.phase).toBe('MOVING');
+
+    // Continues forward cleanly to cell 5 once server time crosses step 2 (>= 900ms elapsed)
+    act(() => vi.advanceTimersByTime(650));
+    expect(result.current.currentCell).toBe(5);
+    expect(result.current.stepIndex).toBe(2);
+  });
+
+  it('anchors server time using monotonic anchor metadata', () => {
+    const anchor = {
+      serverTimeAtRecvMs: serverNow + 300,
+      localMonotonicRecvMs: globalThis.performance.now()
+    };
+    const { result } = renderHook(() => useMovementTimeline({
+      activeMovement: movement,
+      anchor
+    }));
+    // startAt is serverNow + 400; anchor is serverNow + 300, so it starts at STARTING (100ms before start)
+    expect(result.current).toMatchObject({ phase: 'STARTING', currentCell: 2 });
+    act(() => vi.advanceTimersByTime(150));
+    // 50ms into step 0 -> cell 3
+    expect(result.current).toMatchObject({ isMoving: true, currentCell: 3 });
+  });
+
+  it('handles late arrival crossing one step without skipping or crashing (Tahap 5.2)', () => {
+    // startAt = serverNow + 400, stepDuration = 450.
+    // Elapsed = 500ms -> serverTime = serverNow + 400 + 500 = serverNow + 900.
+    // Step 0 was 0..450ms (cell 3).
+    // Elapsed 500ms is 50ms into step 1 (cell 4).
+    const { result } = renderHook(() => useMovementTimeline({
+      activeMovement: movement,
+      serverTime: new Date(serverNow + 900).toISOString()
+    }));
+
+    expect(result.current).toMatchObject({
+      isMoving: true,
+      phase: 'MOVING',
+      stepIndex: 1,
+      currentCell: 4,
+      prevCell: 3
+    });
+    expect(result.current.subStepProgress).toBeCloseTo(50 / 450, 2);
+  });
+
+  it('handles mid-flight reconnect at step 2 and seamlessly continues (Tahap 5.3)', () => {
+    // startAt = serverNow + 400.
+    // Reconnect at elapsed 700ms -> serverTime = serverNow + 1100.
+    // Step 1: 450..900ms -> 250ms into step 1.
+    const { result } = renderHook(() => useMovementTimeline({
+      activeMovement: movement,
+      serverTime: new Date(serverNow + 1100).toISOString()
+    }));
+
+    expect(result.current).toMatchObject({
+      isMoving: true,
+      phase: 'MOVING',
+      stepIndex: 1,
+      currentCell: 4,
+      prevCell: 3
+    });
+    expect(result.current.subStepProgress).toBeCloseTo(250 / 450, 2);
+
+    // Advancing 250ms -> elapsed 950ms (> 900ms) -> step 2 (cell 5)
+    act(() => vi.advanceTimersByTime(250));
+    expect(result.current.stepIndex).toBe(2);
+    expect(result.current.currentCell).toBe(5);
+  });
+
+  it('immediately positions at final destination when snapshot arrives after movement completes (Tahap 5.4)', () => {
+    // endAt is serverNow + 1750.
+    // Snapshot arrives at serverNow + 1800.
+    const { result } = renderHook(() => useMovementTimeline({
+      activeMovement: movement,
+      serverTime: new Date(serverNow + 1800).toISOString()
+    }));
+
+    expect(result.current).toMatchObject({
+      isMoving: false,
+      phase: 'LANDED',
+      currentCell: 5
+    });
+  });
 });

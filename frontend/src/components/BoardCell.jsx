@@ -29,6 +29,7 @@ function BoardCellComponent({
     <li
       className={className}
       style={{ gridRow: cell.row, gridColumn: cell.column }}
+      data-cell-number={cell.number}
       aria-label={`Cell ${cell.number}, ${cell.categoryLabel}, ${cell.title}, ${cell.count} ${cell.count === 1 ? 'team' : 'teams'}`}
     >
       <div className="cell-heading">
