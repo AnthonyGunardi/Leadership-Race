@@ -44,7 +44,9 @@ export function useDisplayBoard() {
   const timeline = useMovementTimeline({ activeMovement, serverTime });
   const view = buildBoardView(snapshot, timeline);
   const status = current.isError ? 'disconnected'
-    : !subscribedGameId && current.isSuccess ? 'connected' : state.status;
+    : !subscribedGameId && current.isSuccess ? 'connected'
+    : (state.status === 'connected' || (current.isSuccess && polled?.data?.game?.id === subscribedGameId))
+      ? 'connected' : state.status;
 
   return {
     ...state,

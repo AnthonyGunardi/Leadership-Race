@@ -44,13 +44,9 @@ export function useControllerLease(session, gameId, { autoAcquire = false } = {}
     && controller.version === credentialVersion && command.error?.code !== 'CONTROLLER_NOT_HELD';
   const status = query.data?.data?.game?.status;
   const allowed = ['RUNNING', 'PAUSED'].includes(status);
-  const disabled = !online || !query.isSuccess || query.isFetching || !allowed || command.pending || command.uncertain;
+  const disabled = !online || !query.isSuccess || !allowed || command.pending || command.uncertain;
 
-  useEffect(() => {
-    const interval = window.setInterval(() => setMonotonicNow(globalThis.performance.now()), 1000);
-    return () => window.clearInterval(interval);
-  }, []);
-  // Heartbeat interval is omitted: in single-admin mode, lease is optional and background heartbeats are not needed.
+  // Single-admin mode: lease heartbeat and 1-second monotonic tick intervals are omitted to eliminate UI flicker.
   useEffect(() => {
     if (command.error?.status === 409) reload();
   }, [command.error, reload]);

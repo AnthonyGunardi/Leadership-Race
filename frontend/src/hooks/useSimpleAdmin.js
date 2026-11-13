@@ -15,7 +15,7 @@ export function useSimpleAdmin({ session, gameId, view, setup }) {
     queryClient.invalidateQueries({ queryKey: ['public-game'] });
   }, [reload, queryClient]);
   const command = useGameCommand(session, onSuccess);
-  const blocked = !view.online || !view.query.isSuccess || view.query.isFetching || launching
+  const blocked = !view.online || !view.query.isSuccess || launching
     || command.pending || command.uncertain || view.command.pending || view.command.uncertain
     || setup.command.pending || setup.command.uncertain;
   const editable = ['DRAFT', 'READY'].includes(view.status);
